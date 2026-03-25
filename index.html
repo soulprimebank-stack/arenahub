@@ -10,6 +10,9 @@
 <meta name="description" content="ArenaHub — Futebol amador na palma da mão"/>
 <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;ArenaHub&quot;,&quot;short_name&quot;:&quot;ArenaHub&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%2307090F&quot;,&quot;theme_color&quot;:&quot;%2300F082&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;,&quot;sizes&quot;:&quot;any&quot;}]}"/>
 <title>ArenaHub ⚽</title>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <style>
 :root{--bg:#07090F;--bg2:#0C0F1A;--surf:#111520;--card:#151B28;--cardhi:#1C2438;--bord:#1E2D45;--green:#00F082;--gold:#FFBE00;--orange:#FF7043;--red:#FF4060;--blue:#4D9EFF;--purple:#B06EFF;--teal:#00D4C8;--pink:#FF4D8D;--text:#EEF2FF;--text2:#A0AECB;--muted:#4E6080;--muted2:#2A3A52;--greenglow:rgba(0,240,130,.14);}
 html.light{--bg:#F4F6FA;--bg2:#EAECF2;--surf:#FFFFFF;--card:#FFFFFF;--cardhi:#F0F2F8;--bord:#D8DCE8;--text:#111827;--text2:#4B5563;--muted:#9CA3AF;--muted2:#D1D5DB;--greenglow:rgba(0,180,100,.1);}
@@ -562,7 +565,7 @@ function openPerfil(){
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'ranking\')">🏆 Ranking</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'mensagens\')">💬 Mensagens</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();openConfigs()">⚙️ Configurações</button>'+
-    '<button class="btn bd bfw" style="font-size:12px;padding:9px 0" onclick="S.logado=false;closeModal();render()">Sair da conta</button>');
+    '<button class="btn bd bfw" style="font-size:12px;padding:9px 0" onclick="doLogout()">Sair da conta</button>');
 }
 function openAdmin(){S.admin=true;S.adminAba='dashboard';render();sc();}
 function openPostModal(){S.pTipo='post';S.pTxt='';renderPostModal();}
@@ -609,24 +612,159 @@ function salvarPerfil(){
   closeModal();toast('Perfil atualizado! ✓');render();
 }
 
+/* ── FIREBASE AUTH ────────────────────────────────── */
+var _fbApp=null,_fbAuth=null;
+function _initFirebase(){
+  if(_fbAuth)return _fbAuth;
+  try{
+    var app=firebase.initializeApp({
+      apiKey:"AIzaSyAWQ3wQ-hLJDgYEBm56lGuZZ3IjgmIhW2w",
+      authDomain:"arenahub-e3fef.firebaseapp.com",
+      projectId:"arenahub-e3fef",
+      storageBucket:"arenahub-e3fef.firebasestorage.app",
+      messagingSenderId:"297395803747",
+      appId:"1:297395803747:web:91c7fe8563b2d2f0b18a56"
+    },'arenahub');
+    _fbApp=app;
+  }catch(e){
+    try{_fbApp=firebase.app('arenahub');}catch(e2){_fbApp=firebase.app();}
+  }
+  _fbAuth=firebase.auth(_fbApp);
+  _fbAuth.languageCode='pt-BR';
+  _fbAuth.onAuthStateChanged(function(user){
+    if(user){
+      S.logado=true;
+      S.fbUser=user;
+      S.perfNome=user.displayName||user.email.split('@')[0];
+      S.perfEmail=user.email;
+      render();
+    }
+  });
+  return _fbAuth;
+}
+
 /* ── LOGIN ACTIONS ────────────────────────────────── */
 function setLoginAba(a){S.loginAba=a;S.loginErro='';render();}
+
 function doLogin(){
   var em=document.getElementById('login-email');
   var sn=document.getElementById('login-senha');
   if(!em||!sn){return;}
   if(!em.value.trim()||!sn.value.trim()){S.loginErro='Preencha email e senha.';render();return;}
-  S.loginErro='';S.logado=true;render();toast('Bem-vindo de volta! 👋');
-  checkOnboarding();
+  S.loginErro='';
+  // Show loading
+  var btn=document.querySelector('#login-btn');
+  if(btn){btn.textContent='Entrando...';btn.disabled=true;}
+  var auth=_initFirebase();
+  auth.signInWithEmailAndPassword(em.value.trim(),sn.value.trim())
+    .then(function(cred){
+      S.logado=true;
+      S.fbUser=cred.user;
+      S.perfNome=cred.user.displayName||cred.user.email.split('@')[0];
+      S.perfEmail=cred.user.email;
+      render();
+      toast('Bem-vindo de volta, '+S.perfNome+'! 👋');
+      checkOnboarding();
+    })
+    .catch(function(err){
+      var msgs={
+        'auth/user-not-found':'Email não encontrado.',
+        'auth/wrong-password':'Senha incorreta.',
+        'auth/invalid-email':'Email inválido.',
+        'auth/too-many-requests':'Muitas tentativas. Tente mais tarde.',
+        'auth/invalid-credential':'Email ou senha incorretos.'
+      };
+      S.loginErro=msgs[err.code]||'Erro ao entrar. Tente novamente.';
+      render();
+    });
 }
-function doDemo(){S.logado=true;render();toast('Modo visitante ativado 🎮');checkOnboarding();}
+
+function doDemo(){
+  var auth=_initFirebase();
+  auth.signInAnonymously()
+    .then(function(cred){
+      S.logado=true;
+      S.fbUser=cred.user;
+      S.perfNome='Visitante';
+      render();
+      toast('Modo visitante ativado 🎮');
+      checkOnboarding();
+    })
+    .catch(function(){
+      // Fallback offline
+      S.logado=true;
+      S.perfNome='Visitante';
+      render();
+      toast('Modo visitante ativado 🎮');
+      checkOnboarding();
+    });
+}
+
 function doCadastro(){
   var nm=document.getElementById('cad-nome');
   var em=document.getElementById('cad-email');
   var sn=document.getElementById('cad-senha');
   if(!nm||!em||!sn||!nm.value.trim()||!em.value.trim()||!sn.value.trim()){S.loginErro='Preencha todos os campos.';render();return;}
-  S.loginErro='';S.logado=true;S.perfNome=nm.value;render();toast('Conta criada! Bem-vindo ⚽');
-  checkOnboarding();
+  if(sn.value.trim().length<6){S.loginErro='Senha precisa ter mínimo 6 caracteres.';render();return;}
+  S.loginErro='';
+  var auth=_initFirebase();
+  auth.createUserWithEmailAndPassword(em.value.trim(),sn.value.trim())
+    .then(function(cred){
+      return cred.user.updateProfile({displayName:nm.value.trim()}).then(function(){return cred.user;});
+    })
+    .then(function(user){
+      S.logado=true;
+      S.fbUser=user;
+      S.perfNome=nm.value.trim();
+      S.perfEmail=em.value.trim();
+      render();
+      toast('Conta criada! Bem-vindo '+S.perfNome+' ⚽');
+      checkOnboarding();
+    })
+    .catch(function(err){
+      var msgs={
+        'auth/email-already-in-use':'Este email já está cadastrado.',
+        'auth/invalid-email':'Email inválido.',
+        'auth/weak-password':'Senha muito fraca. Use pelo menos 6 caracteres.',
+        'auth/operation-not-allowed':'Cadastro desativado temporariamente.'
+      };
+      S.loginErro=msgs[err.code]||'Erro ao criar conta. Tente novamente.';
+      render();
+    });
+}
+
+function doLogout(){
+  var auth=_initFirebase();
+  auth.signOut().then(function(){
+    S.logado=false;
+    S.fbUser=null;
+    S.perfNome='Você';
+    S.perfEmail='';
+    closeModal();
+    render();
+    toast('Até logo! 👋');
+  });
+}
+
+function doLoginGoogle(){
+  var auth=_initFirebase();
+  var provider=new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider)
+    .then(function(cred){
+      S.logado=true;
+      S.fbUser=cred.user;
+      S.perfNome=cred.user.displayName||'Jogador';
+      S.perfEmail=cred.user.email;
+      if(cred.user.photoURL) S.perfFoto=cred.user.photoURL;
+      render();
+      toast('Bem-vindo, '+S.perfNome+'! 🎉');
+      checkOnboarding();
+    })
+    .catch(function(err){
+      if(err.code!=='auth/popup-closed-by-user'){
+        toast('Erro com Google. Tente email/senha.');
+      }
+    });
 }
 
 /* ── FEED ACTIONS ─────────────────────────────────── */
@@ -710,7 +848,7 @@ function screenLogin(){
     o+='<button class="btn bp bfw blg" onclick="doCadastro()">Criar Conta</button>';
   }
   o+='<div class="login-div"><div class="login-div-line"></div><span class="login-div-txt">ou continue com</span><div class="login-div-line"></div></div>';
-  o+='<div class="login-soc"><button class="login-soc-btn" onclick="doDemo()">🎮 Visitante</button><button class="login-soc-btn" onclick="doDemo()"><span style="font-weight:900;font-size:14px;color:#4285F4">G</span> Google</button></div>';
+  o+='<div class="login-soc"><button class="login-soc-btn" onclick="doDemo()">🎮 Visitante</button><button class="login-soc-btn" onclick="doLoginGoogle()"><span style="font-weight:900;font-size:14px;color:#4285F4">G</span> Google</button></div>';
   o+='</div></div>';
   return o;
 }
@@ -1882,6 +2020,11 @@ function sendComment(postId) {
 /* ── BOOT ───────────────────────────────────────── */
 S.onboardingDone = false;
 S.ratingCampo = {};
+// Inicializa Firebase Auth ao carregar
+document.addEventListener('DOMContentLoaded', function(){ 
+  try { _initFirebase(); } catch(e) {}
+});
+try { _initFirebase(); } catch(e) {}
 render();
 startNotifTimer();
 </script>
