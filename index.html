@@ -324,7 +324,7 @@ var S={
 
 /* ── HELPERS ──────────────────────────────────────── */
 function pl(txt,cor,bg){return '<span class="pl" style="background:'+(bg||cor+'22')+';color:'+cor+';border:1px solid '+cor+'35">'+txt+'</span>';}
-function av(em,sz,ring){sz=sz||38;var b=ring?'2px solid '+ring:'1.5px solid var(--bord)';return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--surf);border:'+b+';display:flex;align-items:center;justify-content:center;font-size:'+Math.floor(sz*.43)+'px;flex-shrink:0">'+em+'</div>';}
+function av(em,sz,ring){sz=sz||38;var b=ring?'2px solid '+ring:'1.5px solid var(--bord)';if(em&&em.startsWith('data:')){return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--surf);border:'+b+';overflow:hidden;flex-shrink:0"><img src="'+em+'" style="width:100%;height:100%;object-fit:cover;display:block"></div>';}return '<div style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:var(--surf);border:'+b+';display:flex;align-items:center;justify-content:center;font-size:'+Math.floor(sz*.43)+'px;flex-shrink:0">'+em+'</div>';}
 function stars(nota,sz){sz=sz||12;var s='<span class="stars">';for(var i=1;i<=5;i++)s+='<span style="font-size:'+sz+'px;color:'+(i<=Math.round(nota)?'#FFBE00':'#2A3A52')+'">★</span>';return s+'<span style="color:var(--muted);font-size:'+(sz-1)+'px;margin-left:3px">'+nota+'</span></span>';}
 function dv(){return '<hr class="dv">';}
 function bb(oc){return '<button class="bbtn" onclick="'+oc+'">← Voltar</button>';}
@@ -407,7 +407,15 @@ function openConfigs(){
 }
 function refreshBadges(){
   var av2=document.getElementById('top-av');
-  if(av2)av2.textContent=S.perfAv;
+  if(av2){
+    if(S.perfFoto){
+      av2.innerHTML='<img src="'+S.perfFoto+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+      av2.style.background='none';
+    } else {
+      av2.innerHTML=S.perfAv;
+      av2.style.background='';
+    }
+  }
   var nb=document.getElementById('notif-nb');
   var nl2=D.notifs.filter(function(n){return !n.lida;}).length;
   if(nb)nb.textContent=nl2;
@@ -456,8 +464,11 @@ function openNotif(){
     '</div>'+rows+'<button class="btn bs bfw" style="margin-top:8px" onclick="closeModal()">Fechar</button>');
 }
 function openPerfil(){
+  var avatarEl=S.perfFoto
+    ?'<img src="'+S.perfFoto+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2.5px solid var(--green)">'
+    :av(S.perfAv,72,'var(--green)');
   showModal('<div style="text-align:center;margin-bottom:18px">'+
-    av(S.perfAv,72,'var(--green)')+
+    avatarEl+
     '<div style="font-weight:900;font-size:20px;margin:11px 0 3px">'+esc(S.perfNome)+'</div>'+
     stars(4.7,13)+
     '<div style="display:flex;justify-content:center;gap:22px;margin-top:13px">'+
@@ -496,9 +507,13 @@ function renderPostModal(){
     '<textarea class="ptxt" id="ptxt" placeholder="O que está acontecendo no campo? 🏟️" style="min-height:90px">'+esc(S.pTxt)+'</textarea>'+
     midiaPreview+
     '<div class="ugrid" style="margin-bottom:14px">'+
-    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="image/*" id="inp-foto" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">📷</div><div style="font-weight:700;font-size:12px">Foto</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
-    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="video/*" id="inp-video" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">🎬</div><div style="font-weight:700;font-size:12px">Vídeo</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
-    '</div><div style="display:flex;gap:9px">'+
+    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="image/*" capture="environment" id="inp-foto" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">📷</div><div style="font-weight:700;font-size:12px">Foto</div><div style="color:var(--muted);font-size:10px;margin-top:2px">📸 Câmera</div></label>'+
+    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="video/*" capture="environment" id="inp-video" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">🎬</div><div style="font-weight:700;font-size:12px">Vídeo</div><div style="color:var(--muted);font-size:10px;margin-top:2px">🎥 Câmera</div></label>'+
+    '</div>'+
+    '<div style="display:flex;gap:7px;margin-bottom:14px">'+
+    '<label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px solid var(--bord);border-radius:11px;cursor:pointer;font-size:12px;font-weight:700;color:var(--text2);background:var(--card)"><input type="file" accept="image/*" id="inp-galeria" style="display:none" onchange="handleMidiaUpload(this)">🖼️ Galeria</label>'+
+    '</div>'+
+    '<div style="display:flex;gap:9px">'+
     '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn bp" style="flex:1" id="btn-publicar" onclick="publicarPost()">Publicar ✓</button>'+
     '</div>');
@@ -534,7 +549,8 @@ function publicarPost(){
     likes:0,coments:0,
     hora:'agora',
     tipo:S.pTipo,
-    av:S.perfAv||'🧑',
+    av:S.perfFoto||S.perfAv||'🧑',
+    avTipo:S.perfFoto?'foto':'emoji',
     midia:midia,
     meu:true
   };
@@ -546,19 +562,39 @@ function publicarPost(){
 }
 function openEditPerfil(){
   var avatars=['🧑','⚽','🎯','🛡️','🧤','⚡','💥','🔥','🌀','👑','💎','🦁'];
-  var o='<div style="font-weight:800;font-size:16px;margin:0 0 18px">✏️ Editar Perfil</div>';
+  var fotoAtual=S.perfFoto
+    ?'<img src="'+S.perfFoto+'" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2.5px solid var(--green)">'
+    :'<div style="width:72px;height:72px;border-radius:50%;background:var(--surf);border:2.5px solid var(--green);display:flex;align-items:center;justify-content:center;font-size:32px">'+S.perfAv+'</div>';
+  var o='<div style="font-weight:800;font-size:16px;margin:0 0 16px">✏️ Editar Perfil</div>';
+  o+='<div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px">';
+  o+=fotoAtual;
+  o+='<div style="display:flex;gap:7px">';
+  o+='<label style="display:flex;align-items:center;gap:5px;padding:7px 13px;border:1px solid var(--green);border-radius:99px;font-size:12px;font-weight:700;color:var(--green);cursor:pointer;background:rgba(0,240,130,.08)">📷 Câmera<input type="file" accept="image/*" capture="environment" id="inp-perf-foto" style="display:none" onchange="handleFotoPerfil(this)"></label>';
+  o+='<label style="display:flex;align-items:center;gap:5px;padding:7px 13px;border:1px solid var(--bord);border-radius:99px;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer">🖼️ Galeria<input type="file" accept="image/*" id="inp-perf-gal" style="display:none" onchange="handleFotoPerfil(this)"></label>';
+  if(S.perfFoto)o+='<button style="padding:7px 13px;border:1px solid var(--bord);border-radius:99px;font-size:12px;font-weight:700;color:var(--red);background:none;cursor:pointer" onclick="S.perfFoto=null;openEditPerfil()">✕ Remover</button>';
+  o+='</div></div>';
   o+='<div class="fg"><label class="fl">Nome</label><input class="fi" id="ep-nome" value="'+esc(S.perfNome)+'" placeholder="Seu nome..."></div>';
   o+='<div class="fg"><label class="fl">Posição</label><select class="fi" id="ep-pos">';
   ['GOL','ZAG','LAT','VOL','MEI','ATA','PNT','JUI'].forEach(function(p){o+='<option'+(S.perfPos===p?' selected':'')+'>'+p+'</option>';});
   o+='</select></div><div class="fg"><label class="fl">Nível</label><select class="fi" id="ep-nivel">';
   ['Iniciante','Intermediário','Avançado','Profissional'].forEach(function(p){o+='<option'+(S.perfNivel===p?' selected':'')+'>'+p+'</option>';});
   o+='</select></div><div class="fg"><label class="fl">Cidade</label><input class="fi" id="ep-cidade" value="'+esc(S.perfCidade)+'" placeholder="Ex: Goiânia"></div>';
-  o+='<div class="fg"><label class="fl" style="margin-bottom:10px">Avatar</label><div style="display:flex;gap:8px;flex-wrap:wrap">';
-  avatars.forEach(function(e){o+='<button class="av-opt'+(S.perfAv===e?' sel':'')+'" onclick="S.perfAv=\''+e+'\';openEditPerfil()">'+e+'</button>';});
-  o+='</div></div>'+dv()+'<div style="display:flex;gap:9px">'+
+  if(!S.perfFoto){
+    o+='<div class="fg"><label class="fl" style="margin-bottom:10px">Avatar (emoji)</label><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    avatars.forEach(function(e){o+='<button class="av-opt'+(S.perfAv===e?' sel':'')+'" onclick="S.perfAv=\''+e+'\';openEditPerfil()">'+e+'</button>';});
+    o+='</div></div>';
+  }
+  o+=dv()+'<div style="display:flex;gap:9px">'+
     '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn bp" style="flex:1" onclick="salvarPerfil()">Salvar ✓</button></div>';
   showModal(o);
+}
+function handleFotoPerfil(input){
+  var file=input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){S.perfFoto=e.target.result;openEditPerfil();};
+  reader.readAsDataURL(file);
 }
 function salvarPerfil(){
   var nm=document.getElementById('ep-nome');
@@ -924,6 +960,9 @@ function screenSocial(){
   o+='<div class="ftabs">';
   TABS.forEach(function(t){o+='<button class="ftab'+(S.feedTab===t.id?' a':'')+'" onclick="setFeedTab(\''+t.id+'\')">'+t.l+'</button>';});
   o+='</div>';
+
+  // Banner tempo real
+  o+='<div id="rt-banner" onclick="loadRtPosts()" style="display:none;background:linear-gradient(90deg,var(--green),var(--teal));color:var(--bg);text-align:center;padding:9px 14px;font-size:13px;font-weight:800;cursor:pointer;position:sticky;top:0;z-index:50;letter-spacing:.2px"></div>';
 
   // Posts
   if(feed.length===0){
@@ -1724,7 +1763,44 @@ function screenAdmin(){
     content+'</div></div>';
 }
 
-/* ── DARK MODE ──────────────────────────────────── */
+/* ── REALTIME FEED ──────────────────────────────── */
+var _rtPosts=[
+  {user:'Marquinhos Silva',time:'Leões FC',txt:'Que golaço no treino hoje! 🔥⚽',tipo:'gol',av:'⚽'},
+  {user:'Camila Duarte',time:'',txt:'Vaga aberta para atacante amanhã às 19h no Arena Norte. Quem topa? 🏟️',tipo:'vaga',av:'🎯'},
+  {user:'Pedro Henrique',time:'Rápidos SC',txt:'Confirmado! Jogo contra os Guerreiros no sábado. 3×0 quem diria 😂🏆',tipo:'resultado',av:'👑'},
+  {user:'Lucas Freitas',time:'',txt:'Campo do Cerrado com promoção especial hoje, 30% OFF. Aproveitem! 💚',tipo:'promo',av:'🏟️'},
+  {user:'Ana Rodrigues',time:'Estrelas FC',txt:'Assistência do campeonato! Bola perfeita no ângulo 🎯',tipo:'gol',av:'💥'},
+  {user:'Diego Campos',time:'',txt:'Quem tem interesse em treino coletivo domingo cedo? Manda mensagem!',tipo:'post',av:'🔥'},
+];
+var _rtIdx=0;
+var _rtPendentes=[];
+var _rtTimer=null;
+function startRealtimeFeed(){
+  _rtTimer=setInterval(function(){
+    if(!S.logado)return;
+    var base=_rtPosts[_rtIdx%_rtPosts.length];
+    _rtIdx++;
+    var novo=Object.assign({},base,{id:Date.now(),likes:Math.floor(Math.random()*15),coments:Math.floor(Math.random()*5),hora:'agora'});
+    _rtPendentes.push(novo);
+    var banner=document.getElementById('rt-banner');
+    if(banner){
+      banner.style.display='block';
+      var n=_rtPendentes.length;
+      banner.textContent='▲ '+n+(n>1?' novas publicações':' nova publicação')+' — toque para ver';
+    }
+  },18000+Math.floor(Math.random()*12000));
+}
+function loadRtPosts(){
+  if(_rtPendentes.length===0)return;
+  _rtPendentes.forEach(function(p){D.feed.unshift(p);});
+  _rtPendentes=[];
+  var banner=document.getElementById('rt-banner');
+  if(banner)banner.style.display='none';
+  render();
+  var scr=document.getElementById('screen');
+  if(scr)scr.scrollTop=0;
+  toast('Feed atualizado! ✓');
+}
 var darkMode = true;
 function toggleDark() {
   darkMode = !darkMode;
@@ -1983,6 +2059,7 @@ document.addEventListener('DOMContentLoaded', function(){
 try { _initFirebase(); } catch(e) {}
 render();
 startNotifTimer();
+startRealtimeFeed();
 </script>
 </body>
 </html>
