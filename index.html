@@ -266,127 +266,38 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
 "use strict";
 /* ── DATA ─────────────────────────────────────────── */
 var D={
-  jogadores:[
-    {id:1, nome:"Lucas Ferreira",  pos:"ATA", nivel:"Avançado",    gols:23,assist:11,nota:4.9,av:"⚽",cidade:"Goiânia",  time:"Leões do Cerrado",jogos:47,altura:"1,78m",pe:"Direito",   seg:412},
-    {id:2, nome:"Rafael Costa",    pos:"MEI", nivel:"Intermediário",gols:8, assist:19,nota:4.6,av:"🎯",cidade:"Goiânia",  time:"Águias FC",       jogos:39,altura:"1,75m",pe:"Esquerdo", seg:287},
-    {id:3, nome:"Pedro Alves",     pos:"ZAG", nivel:"Avançado",    gols:3, assist:4, nota:4.7,av:"🛡️",cidade:"Brasília", time:"Leões do Cerrado",jogos:52,altura:"1,88m",pe:"Direito",   seg:198},
-    {id:4, nome:"João Mendes",     pos:"GOL", nivel:"Intermediário",gols:0, assist:2, nota:4.5,av:"🧤",cidade:"Goiânia",  time:"Lobos Bravos",    jogos:31,altura:"1,82m",pe:"Direito",   seg:143},
-    {id:5, nome:"Carlos Lima",     pos:"LAT", nivel:"Iniciante",   gols:5, assist:8, nota:4.2,av:"⚡",cidade:"Goiânia",  time:null,              jogos:18,altura:"1,72m",pe:"Direito",   seg:76},
-    {id:6, nome:"Marcos Souza",    pos:"VOL", nivel:"Profissional", gols:7, assist:14,nota:4.8,av:"💥",cidade:"São Paulo",time:"Trovões SC",      jogos:68,altura:"1,80m",pe:"Ambidestro",seg:891},
-    {id:7, nome:"Diego Nunes",     pos:"ATA", nivel:"Avançado",    gols:31,assist:9, nota:4.9,av:"🔥",cidade:"Goiânia",  time:"Águias FC",       jogos:55,altura:"1,76m",pe:"Esquerdo", seg:634},
-    {id:8, nome:"Thiago Rocha",    pos:"ZAG", nivel:"Intermediário",gols:2, assist:3, nota:4.3,av:"🏰",cidade:"Goiânia",  time:null,              jogos:22,altura:"1,84m",pe:"Direito",   seg:89},
-    {id:9, nome:"Bruno Carvalho",  pos:"MEI", nivel:"Avançado",    gols:11,assist:22,nota:4.8,av:"🌀",cidade:"Goiânia",  time:"Panteras Negras", jogos:44,altura:"1,74m",pe:"Esquerdo", seg:367},
-    {id:10,nome:"Roberto Figueira",pos:"JUI", nivel:"Profissional", gols:0, assist:0, nota:4.9,av:"🟡",cidade:"Goiânia",  time:null,              jogos:312,altura:"1,80m",pe:"Direito",  seg:523,
-     juiz:{cartoes_am:847,cartoes_vm:62,penaltis:94,faltas:3210,partidas:312,federacao:"FGF",licenca:"FIFA Certificado",especializacao:"Futebol Society e Futebol 7",disponivel:true}},
-    {id:11,nome:"Ana Paula Reis",  pos:"JUI", nivel:"Avançado",    gols:0, assist:0, nota:4.8,av:"⚖️",cidade:"Goiânia",  time:null,              jogos:147,altura:"1,65m",pe:"Direito",  seg:289,
-     juiz:{cartoes_am:412,cartoes_vm:28,penaltis:41,faltas:1876,partidas:147,federacao:"FGF",licenca:"CBF Certificada",especializacao:"Futebol Feminino e Society",disponivel:true}},
-    {id:12,nome:"Marcos Teixeira", pos:"JUI", nivel:"Iniciante",   gols:0, assist:0, nota:4.2,av:"🏁",cidade:"Brasília", time:null,              jogos:18, altura:"1,75m",pe:"Esquerdo", seg:47,
-     juiz:{cartoes_am:52,cartoes_vm:4,penaltis:8,faltas:398,partidas:18,federacao:"FAF",licenca:"Em formação",especializacao:"Futebol Amador",disponivel:true}}
-  ],
-  times:[
-    {id:1,nome:"Leões do Cerrado",vit:18,emp:3,der:4, gols:67,gc:28,mem:14,badge:"🦁",cidade:"Goiânia",  cor:"#FFBE00",form:"4-3-3",ano:"2019"},
-    {id:2,nome:"Águias FC",       vit:15,emp:4,der:6, gols:52,gc:31,mem:16,badge:"🦅",cidade:"Goiânia",  cor:"#4D9EFF",form:"4-4-2",ano:"2020"},
-    {id:3,nome:"Lobos Bravos",    vit:12,emp:5,der:8, gols:44,gc:39,mem:13,badge:"🐺",cidade:"Brasília", cor:"#B06EFF",form:"3-5-2",ano:"2018"},
-    {id:4,nome:"Trovões SC",      vit:10,emp:5,der:10,gols:38,gc:42,mem:15,badge:"⚡",cidade:"São Paulo",cor:"#FF7043",form:"4-2-3-1",ano:"2021"},
-    {id:5,nome:"Panteras Negras", vit:8, emp:6,der:11,gols:33,gc:45,mem:12,badge:"🐆",cidade:"Goiânia",  cor:"#00F082",form:"4-3-3",ano:"2022"}
-  ],
-  campos:[
-    {id:1,nome:"Arena Verde",      end:"R. das Palmeiras, 123",preco:120,nota:4.9,avs:147,img:"🏟️",cor:"#00F082",seg:312,fotos:["🌿","⚽","🏟️","🌙"],comod:["Vestiário","Estacionamento","Iluminação","Gramado Natural","Bar","Wi-Fi"],vagas:3,promo:{desc:"20% OFF nas terças",val:"31/03",dest:true},videos:[{thumb:"🎬",titulo:"Tour pelo campo",dur:"1:24"},{thumb:"🏆",titulo:"Final do torneio",dur:"3:07"}],
-     planos:[{id:"b",nome:"Básico",preco:180,desc:"4 reservas/mês"},{id:"p",nome:"Premium",preco:320,desc:"Reservas ilimitadas + prioridade"}],
-     membros:[{av:"⚽",nome:"Lucas Ferreira",plano:"Premium",desde:"Jan/25"},{av:"🔥",nome:"Diego Nunes",plano:"Premium",desde:"Fev/25"},{av:"🎯",nome:"Rafael Costa",plano:"Básico",desde:"Mar/25"},{av:"🛡️",nome:"Pedro Alves",plano:"Básico",desde:"Mar/25"},{av:"💥",nome:"Marcos Souza",plano:"Premium",desde:"Nov/24"}]},
-    {id:2,nome:"Campo do Cerrado", end:"Av. T-63, 456",        preco:90, nota:4.7,avs:98, img:"⛳",cor:"#00D4C8",seg:187,fotos:["🌱","⛳","💧","🌅"],comod:["Vestiário","Gramado Sintético","Bar","Chuveiros"],vagas:5,promo:{desc:"Combo: 2h por R$160",val:"15/04",dest:false},videos:[{thumb:"🎥",titulo:"Campo iluminado",dur:"0:58"}],
-     planos:[{id:"b",nome:"Básico",preco:140,desc:"3 reservas/mês"},{id:"p",nome:"Plus",preco:240,desc:"6 reservas/mês + desconto"}],
-     membros:[{av:"🌀",nome:"Bruno Carvalho",plano:"Plus",desde:"Fev/25"},{av:"🧤",nome:"João Mendes",plano:"Básico",desde:"Jan/25"},{av:"⚡",nome:"Carlos Lima",plano:"Básico",desde:"Mar/25"}]},
-    {id:3,nome:"Estádio Central",  end:"Rua Central, 789",     preco:150,nota:4.8,avs:203,img:"🏆",cor:"#FFBE00",seg:521,fotos:["🏟️","🎺","🏆","📸"],comod:["Vestiário","Estacionamento","Iluminação","Arquibancada","Placar","Bar"],vagas:2,promo:null,videos:[{thumb:"🎬",titulo:"Estádio completo",dur:"2:15"}],
-     planos:[{id:"b",nome:"Sócio",preco:250,desc:"4 reservas/mês + arquibancada"},{id:"p",nome:"Sócio VIP",preco:450,desc:"Reservas ilimitadas + camarote"}],
-     membros:[{av:"⚽",nome:"Lucas Ferreira",plano:"Sócio VIP",desde:"Out/24"},{av:"🔥",nome:"Diego Nunes",plano:"Sócio VIP",desde:"Nov/24"},{av:"💥",nome:"Marcos Souza",plano:"Sócio",desde:"Jan/25"}]},
-    {id:4,nome:"Quadra do Parque", end:"Parque Flamboyant,s/n",preco:70, nota:4.5,avs:62, img:"🌿",cor:"#B06EFF",seg:94,fotos:["🌿","🌳","☀️","🏃"],comod:["Gramado Natural","Bebedouro","Estacionamento"],vagas:8,promo:{desc:"Cadastro grátis em torneios",val:"Mensal",dest:false},videos:[],
-     planos:[{id:"b",nome:"Mensal",preco:100,desc:"Reservas com desconto + torneios gratuitos"}],
-     membros:[{av:"⚡",nome:"Carlos Lima",plano:"Mensal",desde:"Mar/25"}]}
-  ],
-  horarios:[
-    {id:1,hora:"08:00",data:"Seg 10/03",disp:true},{id:2,hora:"10:00",data:"Seg 10/03",disp:false},
-    {id:3,hora:"14:00",data:"Ter 11/03",disp:true},{id:4,hora:"19:00",data:"Ter 11/03",disp:true},
-    {id:5,hora:"20:30",data:"Qua 12/03",disp:true},{id:6,hora:"09:00",data:"Qui 13/03",disp:false},
-    {id:7,hora:"16:00",data:"Sex 14/03",disp:true},{id:8,hora:"20:00",data:"Sáb 15/03",disp:true}
-  ],
-  feed:[
-    {id:1,user:"Lucas Ferreira",  time:"Leões do Cerrado",txt:"Que jogo incrível hoje! 4×2 pra nós! Equipe perfeita 🔥",          likes:34,coments:8, hora:"2h", tipo:"resultado",av:"⚽",midia:{tipo:"video",thumb:"🎬",dur:"0:47",views:891}},
-    {id:2,user:"Arena Verde",     time:"Campo",          txt:"🔥 PROMOÇÃO: Terças com 20% de desconto! Reserve agora.",           likes:56,coments:12,hora:"3h", tipo:"promo",   av:"🏟️",midia:{tipo:"fotos",fotos:["🌿","⚽","🌙","🏟️"]}},
-    {id:3,user:"Rafael Costa",    time:"Águias FC",      txt:"Precisamos de 1 atacante pra quarta-feira às 19h! 🦅⚽",           likes:56,coments:22,hora:"6h", tipo:"vaga",    av:"🦅",midia:null},
-    {id:4,user:"Diego Nunes",     time:"Águias FC",      txt:"Meu 31º gol da temporada!! 🙏🔥 Que fase boa!",                    likes:89,coments:31,hora:"8h", tipo:"gol",     av:"🔥",midia:{tipo:"video",thumb:"⚽",dur:"0:23",views:2341}},
-    {id:5,user:"Campo do Cerrado",time:"Campo",          txt:"📸 Nova iluminação LED! Agora jogamos até meia-noite.",            likes:44,coments:9, hora:"10h",tipo:"campo",  av:"⛳",midia:{tipo:"fotos",fotos:["🌙","💡","⚽","🌿"]}},
-    {id:6,user:"Marcos Souza",    time:"Trovões SC",     txt:"Treino pesado hoje! Chegando forte pro torneio ⚡",               likes:28,coments:5, hora:"1d", tipo:"post",    av:"💥",midia:{tipo:"video",thumb:"💪",dur:"1:12",views:567}},
-    {id:7,user:"Pedro Alves",     time:"Leões do Cerrado",txt:"Defesa sólida = vitória garantida. Jogo de domingo confirmado! 🛡️",likes:28,coments:5,hora:"1d",tipo:"post",  av:"🛡️",midia:null}
-  ],
+  jogadores:[],
+  times:[],
+  campos:[],
+  horarios:[],
+  feed:[],
   stories:[
-    {id:1,user:"Você",       av:"🧑",add:true},
-    {id:2,user:"Lucas",      av:"⚽",cor:"#00F082,#00D4C8"},
-    {id:3,user:"Arena Verde",av:"🏟️",cor:"#FFBE00,#FF7043"},
-    {id:4,user:"Diego",      av:"🔥",cor:"#FF7043,#FF4D8D"},
-    {id:5,user:"Águias FC",  av:"🦅",cor:"#4D9EFF,#B06EFF",visto:true},
-    {id:6,user:"Campo Cerr.",av:"⛳",cor:"#00D4C8,#4D9EFF",visto:true},
-    {id:7,user:"Marcos",     av:"💥",cor:"#B06EFF,#FF4D8D",visto:true}
+    {id:1,user:"Você",av:"🧑",add:true}
   ],
-  notifs:[
-    {id:1,txt:"Águias FC precisa de Atacante para Qua 19h",hora:"Agora",tipo:"vaga",   lida:false},
-    {id:2,txt:"Reserva na Arena Verde confirmada ✅",       hora:"1h",  tipo:"reserva",lida:false},
-    {id:3,txt:"Lucas curtiu seu vídeo do jogo",             hora:"2h",  tipo:"curtida",lida:false},
-    {id:4,txt:"Lucas te avaliou com ⭐⭐⭐⭐⭐",            hora:"3h",  tipo:"av",     lida:true},
-    {id:5,txt:"Jogo amanhã às 19h — Campo do Cerrado",      hora:"5h",  tipo:"jogo",   lida:true}
-  ],
-  chat:[
-    {id:1,de:"Lucas Ferreira",msg:"Galera, jogo confirmado pra sexta!",  hora:"10:23",meu:false,av:"⚽"},
-    {id:2,de:"Rafael Costa",  msg:"Confirmado! Levo o colete.",           hora:"10:25",meu:false,av:"🎯"},
-    {id:3,de:"Você",          msg:"Eu vou! Podem contar comigo 💪",       hora:"10:31",meu:true, av:"🧑"},
-    {id:4,de:"Pedro Alves",   msg:"Boa! Precisa de mais 2 ainda",         hora:"10:45",meu:false,av:"🛡️"},
-    {id:5,de:"Lucas Ferreira",msg:"Vou postar no feed que tem vaga",      hora:"11:02",meu:false,av:"⚽"}
-  ],
-  jogos:[
-    {id:1,t1:"Leões do Cerrado",t2:"Águias FC",      pl:"3-1",data:"08/03",campo:"Arena Verde",     b1:"🦁",b2:"🦅",enc:true},
-    {id:2,t1:"Lobos Bravos",    t2:"Trovões SC",     pl:"2-2",data:"08/03",campo:"Campo do Cerrado",b1:"🐺",b2:"⚡",enc:true},
-    {id:3,t1:"Leões do Cerrado",t2:"Panteras Negras",pl:null, data:"15/03",campo:"Estádio Central", b1:"🦁",b2:"🐆",enc:false},
-    {id:4,t1:"Águias FC",       t2:"Lobos Bravos",   pl:null, data:"16/03",campo:"Arena Verde",     b1:"🦅",b2:"🐺",enc:false}
-  ],
-  torneios:[
-    {id:1,nome:"Copa do Cerrado 2025",   esporte:"Futebol Society",times:8, maxTimes:16,preco:150,premio:"R$ 2.000",data:"20/04",campo:"Arena Verde",     status:"aberto",  badge:"🏆",cor:"#FFBE00",inscritos:6,
-     bracket:[[{t1:"Leões 🦁",g1:3,t2:"Águias 🦅",g2:1},{t1:"Lobos 🐺",g1:2,t2:"Trovões ⚡",g2:2},{t1:"Panteras 🐆",g1:1,t2:"Fulanos FC",g2:0},{t1:"Relâmpago ⚡",g1:null,t2:"Bravos",g2:null}],[{t1:"Leões 🦁",g1:null,t2:"?",g2:null},{t1:"Panteras 🐆",g1:null,t2:"?",g2:null}],[{t1:"?",g1:null,t2:"?",g2:null}]]},
-    {id:2,nome:"Torneio Relâmpago",      esporte:"Futebol 7",      times:4, maxTimes:8, preco:80, premio:"R$ 800", data:"15/03",campo:"Campo do Cerrado",status:"aberto",  badge:"⚡",cor:"#4D9EFF",inscritos:4,bracket:[]},
-    {id:3,nome:"Liga Goiânia Amador",    esporte:"Futebol 11",     times:12,maxTimes:12,preco:200,premio:"R$ 5.000",data:"01/03",campo:"Estádio Central", status:"andamento",badge:"🦁",cor:"#00F082",inscritos:12,bracket:[]},
-    {id:4,nome:"Torneio das Estrelas",   esporte:"Futsal",         times:0, maxTimes:16,preco:60, premio:"R$ 600", data:"30/04",campo:"Quadra do Parque", status:"aberto",  badge:"⭐",cor:"#FF7043",inscritos:0,bracket:[]},
-    {id:5,nome:"Campeonato Goiano Sub30",esporte:"Futebol Society",times:8, maxTimes:8, preco:180,premio:"R$ 3.500",data:"10/02",campo:"Arena Verde",     status:"encerrado",badge:"🎖️",cor:"#B06EFF",inscritos:8,bracket:[]}
-  ],
+  notifs:[],
+  chat:[],
+  jogos:[],
+  torneios:[],
   conquistas:[
-    {id:1,ic:"⚽",nome:"Primeiro Gol",  desc:"1º gol marcado",   on:true, cor:"#FFBE00", tipo:"jogador"},
-    {id:2,ic:"🎯",nome:"Assistente",    desc:"10 assistências",  on:true, cor:"#4D9EFF", tipo:"jogador"},
-    {id:3,ic:"🏆",nome:"Campeão",       desc:"Venceu torneio",   on:true, cor:"#00F082", tipo:"jogador"},
+    {id:1,ic:"⚽",nome:"Primeiro Gol",  desc:"1º gol marcado",   on:false,cor:"#FFBE00", tipo:"jogador"},
+    {id:2,ic:"🎯",nome:"Assistente",    desc:"10 assistências",  on:false,cor:"#4D9EFF", tipo:"jogador"},
+    {id:3,ic:"🏆",nome:"Campeão",       desc:"Venceu torneio",   on:false,cor:"#00F082", tipo:"jogador"},
     {id:4,ic:"🔥",nome:"Em Chamas",     desc:"5 gols seguidos",  on:false,cor:"#FF7043", tipo:"jogador"},
     {id:5,ic:"🛡️",nome:"Muralha",      desc:"10 defesas",       on:false,cor:"#B06EFF", tipo:"jogador"},
     {id:6,ic:"👑",nome:"Lenda",         desc:"100 jogos",        on:false,cor:"#FFBE00", tipo:"jogador"},
     {id:7,ic:"⚡",nome:"Relâmpago",     desc:"Gol em 1 min",     on:false,cor:"#00D4C8", tipo:"jogador"},
     {id:8,ic:"💎",nome:"Diamante",      desc:"Nota 5.0",         on:false,cor:"#B06EFF", tipo:"jogador"},
-    {id:9, ic:"🟡",nome:"100 Partidas", desc:"100 jogos apitados",on:true, cor:"#FFBE00", tipo:"juiz"},
-    {id:10,ic:"📋",nome:"Cartão Limpo", desc:"10 jogos sem vm",  on:true, cor:"#00F082", tipo:"juiz"},
-    {id:11,ic:"⚖️",nome:"Imparcial",   desc:"Nota 4.5+ mantida",on:true, cor:"#4D9EFF", tipo:"juiz"},
+    {id:9, ic:"🟡",nome:"100 Partidas", desc:"100 jogos apitados",on:false,cor:"#FFBE00", tipo:"juiz"},
+    {id:10,ic:"📋",nome:"Cartão Limpo", desc:"10 jogos sem vm",  on:false,cor:"#00F082", tipo:"juiz"},
+    {id:11,ic:"⚖️",nome:"Imparcial",   desc:"Nota 4.5+ mantida",on:false,cor:"#4D9EFF", tipo:"juiz"},
     {id:12,ic:"🎓",nome:"Certificado",  desc:"Licença federação",on:false,cor:"#B06EFF", tipo:"juiz"},
     {id:13,ic:"🏅",nome:"Finalista",    desc:"Apitou final major",on:false,cor:"#FFBE00", tipo:"juiz"},
     {id:14,ic:"🌟",nome:"5 Estrelas",   desc:"Nota perfeita",    on:false,cor:"#FF7043", tipo:"juiz"}
   ],
-  msgs:[
-    {id:1,nome:"Lucas Ferreira",av:"⚽",ultima:"Confirmado pra sexta!",hora:"10:31",nl:2,
-     chat:[{id:1,txt:"E aí, vai na sexta?",meu:false,hora:"10:28"},{id:2,txt:"Vai sim! Pode contar 💪",meu:true,hora:"10:29"},{id:3,txt:"Confirmado pra sexta!",meu:false,hora:"10:31"}]},
-    {id:2,nome:"Arena Verde",   av:"🏟️",ultima:"Reserva confirmada ✅",hora:"09:15",nl:1,
-     chat:[{id:1,txt:"Olá! Sua reserva foi confirmada para Ter 14h ✅",meu:false,hora:"09:15"}]},
-    {id:3,nome:"Diego Nunes",   av:"🔥",ultima:"Boa sorte no jogo hoje!",hora:"Ontem",nl:0,
-     chat:[{id:1,txt:"Vai com tudo hoje!",meu:false,hora:"Ontem"},{id:2,txt:"Boa sorte no jogo hoje!",meu:false,hora:"Ontem"}]},
-    {id:4,nome:"Águias FC",     av:"🦅",ultima:"Reunião antes do jogo 19h",hora:"Ontem",nl:0,
-     chat:[{id:1,txt:"Reunião antes do jogo às 18h no campo",meu:false,hora:"Ontem"}]},
-    {id:5,nome:"Pedro Alves",   av:"🛡️",ultima:"Valeu brother 💪",hora:"Seg",nl:0,
-     chat:[{id:1,txt:"Valeu brother 💪",meu:false,hora:"Seg"}]}
-  ],
-  rel:{rec:18400,res:142,users:89,ncampos:34,cresc:23,
-    sem:[2100,3200,2800,4100,3600,4800,3900],
-    top:[{nome:"Arena Verde",res:48,rec:5760},{nome:"Estádio Central",res:31,rec:4650},{nome:"Campo do Cerrado",res:38,rec:3420}]}
+  msgs:[],
+  rel:{rec:0,res:0,users:0,ncampos:0,cresc:0,
+    sem:[0,0,0,0,0,0,0],
+    top:[]}
 };
 
 /* ── STATE ────────────────────────────────────────── */
@@ -568,21 +479,70 @@ function openPerfil(){
     '<button class="btn bd bfw" style="font-size:12px;padding:9px 0" onclick="doLogout()">Sair da conta</button>');
 }
 function openAdmin(){S.admin=true;S.adminAba='dashboard';render();sc();}
-function openPostModal(){S.pTipo='post';S.pTxt='';renderPostModal();}
+function openPostModal(){S.pTipo='post';S.pTxt='';S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal();}
 function renderPostModal(){
-  var tipos=[{id:'post',l:'✏️ Post'},{id:'gol',l:'⚽ Gol'},{id:'vaga',l:'🔍 Vaga'},{id:'video',l:'🎬 Vídeo'}];
+  var tipos=[{id:'post',l:'✏️ Post'},{id:'gol',l:'⚽ Gol'},{id:'vaga',l:'🔍 Vaga'},{id:'resultado',l:'🏆 Resultado'}];
   var tybtns=tipos.map(function(t){return '<button class="ptyp'+(S.pTipo===t.id?' a':'')+'" onclick="S.pTipo=\''+t.id+'\';renderPostModal()">'+t.l+'</button>';}).join('');
+  var midiaPreview='';
+  if(S.pMidiaUrl){
+    if(S.pMidiaTipo&&S.pMidiaTipo.startsWith('video')){
+      midiaPreview='<video src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:200px;margin-bottom:10px" controls></video>';
+    } else {
+      midiaPreview='<div style="position:relative;margin-bottom:10px"><img src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:200px;object-fit:cover"><button onclick="S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:99px;width:26px;height:26px;font-size:14px;cursor:pointer">✕</button></div>';
+    }
+  }
   showModal('<div style="font-weight:800;font-size:15px;margin:0 0 14px">📱 Nova publicação</div>'+
     '<div class="ptyps">'+tybtns+'</div>'+
-    '<textarea class="ptxt" id="ptxt" placeholder="O que está acontecendo no campo? 🏟️">'+esc(S.pTxt)+'</textarea>'+
-    '<div class="ugrid">'+
-    '<div class="ubox"><div style="font-size:26px;margin-bottom:4px">📷</div><div style="font-weight:700;font-size:12px">Foto</div><div style="color:var(--muted);font-size:10px;margin-top:2px">JPG, PNG</div></div>'+
-    '<div class="ubox"><div style="font-size:26px;margin-bottom:4px">🎬</div><div style="font-weight:700;font-size:12px">Vídeo</div><div style="color:var(--muted);font-size:10px;margin-top:2px">MP4, MOV</div></div>'+
+    '<textarea class="ptxt" id="ptxt" placeholder="O que está acontecendo no campo? 🏟️" style="min-height:90px">'+esc(S.pTxt)+'</textarea>'+
+    midiaPreview+
+    '<div class="ugrid" style="margin-bottom:14px">'+
+    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="image/*" id="inp-foto" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">📷</div><div style="font-weight:700;font-size:12px">Foto</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
+    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="video/*" id="inp-video" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">🎬</div><div style="font-weight:700;font-size:12px">Vídeo</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
     '</div><div style="display:flex;gap:9px">'+
     '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>'+
-    '<button class="btn bp" style="flex:1" onclick="closeModal();toast(\'Publicado! ✓\')">Publicar ✓</button>'+
+    '<button class="btn bp" style="flex:1" id="btn-publicar" onclick="publicarPost()">Publicar ✓</button>'+
     '</div>');
   setTimeout(function(){var el=document.getElementById('ptxt');if(el)el.addEventListener('input',function(e){S.pTxt=e.target.value;});},50);
+}
+function handleMidiaUpload(input){
+  var file=input.files[0];
+  if(!file)return;
+  S.pMidiaTipo=file.type;
+  var reader=new FileReader();
+  reader.onload=function(e){S.pMidiaUrl=e.target.result;renderPostModal();};
+  reader.readAsDataURL(file);
+}
+function publicarPost(){
+  var el=document.getElementById('ptxt');
+  var txt=el?el.value:S.pTxt;
+  if(!txt||!txt.trim()){toast('Escreva algo antes de publicar ✏️');return;}
+  var btn=document.getElementById('btn-publicar');
+  if(btn){btn.textContent='Publicando...';btn.disabled=true;}
+  var midia=null;
+  if(S.pMidiaUrl){
+    if(S.pMidiaTipo&&S.pMidiaTipo.startsWith('video')){
+      midia={tipo:'video',url:S.pMidiaUrl,thumb:'🎬',dur:'',views:0};
+    } else {
+      midia={tipo:'foto',url:S.pMidiaUrl};
+    }
+  }
+  var novoPost={
+    id:Date.now(),
+    user:S.perfNome||'Usuário',
+    time:S.perfTime||'',
+    txt:txt.trim(),
+    likes:0,coments:0,
+    hora:'agora',
+    tipo:S.pTipo,
+    av:S.perfAv||'🧑',
+    midia:midia,
+    meu:true
+  };
+  D.feed.unshift(novoPost);
+  S.pTxt='';S.pMidiaUrl=null;S.pMidiaTipo=null;
+  closeModal();
+  render();
+  toast('Publicado! ✓ 🎉');
 }
 function openEditPerfil(){
   var avatars=['🧑','⚽','🎯','🛡️','🧤','⚡','💥','🔥','🌀','👑','💎','🦁'];
@@ -856,7 +816,7 @@ function screenLogin(){
 /* ── INÍCIO ─────────────────────────────────────── */
 function screenInicio(){
   var jogos=D.jogos.filter(function(j){return S.jogoTab==='rec'?j.enc:!j.enc;});
-  var vagas=[{time:'Águias FC',pos:'ATA',hora:'Qua 19h',badge:'🦅',cor:'#4D9EFF'},{time:'Leões do Cerrado',pos:'VOL',hora:'Sex 20h',badge:'🦁',cor:'#FFBE00'},{time:'Trovões SC',pos:'LAT',hora:'Sáb 09h',badge:'⚡',cor:'#FF7043'}];
+  var vagas=[];
   var o='<div class="fu" style="padding:0 14px">';
 
   // Hero
@@ -966,6 +926,9 @@ function screenSocial(){
   o+='</div>';
 
   // Posts
+  if(feed.length===0){
+    o+='<div class="empty" style="padding:48px 20px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚽</div><div style="font-weight:800;font-size:16px;margin-bottom:8px;color:var(--text)">Nenhuma publicação ainda</div><div style="color:var(--muted);font-size:13px;margin-bottom:20px">Seja o primeiro a publicar algo!</div><button class="btn bp" onclick="openPostModal()">📱 Criar publicação</button></div>';
+  }
   feed.forEach(function(post){
     var cor=TCOR[post.tipo]||'#4E6080';
     var curtido=S.curtidos[post.id];
@@ -974,18 +937,22 @@ function screenSocial(){
     var playing=S.vplay===post.id;
     var midia='';
     if(post.midia){
-      if(post.midia.tipo==='video'){
+      if(post.midia.tipo==='foto'&&post.midia.url){
+        midia='<div style="border-radius:14px;overflow:hidden;margin-bottom:10px;background:var(--surf)"><img src="'+post.midia.url+'" style="width:100%;max-height:300px;object-fit:cover;display:block"></div>';
+      }else if(post.midia.tipo==='video'&&post.midia.url){
+        midia='<div style="border-radius:14px;overflow:hidden;margin-bottom:10px;background:var(--surf)"><video src="'+post.midia.url+'" style="width:100%;max-height:300px" controls playsinline></video></div>';
+      }else if(post.midia.tipo==='video'){
         if(playing){
           midia='<div class="post-vid" style="flex-direction:column;gap:7px;cursor:pointer" onclick="toggleVideo('+post.id+')">'+
-            '<div style="font-size:48px;animation:pulse 1.5s infinite">'+post.midia.thumb+'</div>'+
+            '<div style="font-size:48px;animation:pulse 1.5s infinite">'+(post.midia.thumb||'🎬')+'</div>'+
             '<span style="font-size:12px;font-weight:700">Reproduzindo...</span>'+
             '<div style="width:78%;height:3px;background:var(--bord);border-radius:99px;margin-top:3px"><div style="width:38%;height:100%;background:var(--green);border-radius:99px"></div></div></div>';
         }else{
           midia='<div class="post-vid" onclick="toggleVideo('+post.id+')">'+
-            '<div style="font-size:54px">'+post.midia.thumb+'</div>'+
+            '<div style="font-size:54px">'+(post.midia.thumb||'🎬')+'</div>'+
             '<div class="play-ic">▶️</div>'+
-            '<div class="vid-dur">'+post.midia.dur+'</div>'+
-            '<div class="vid-views">👁 '+(post.midia.views||0).toLocaleString('pt-BR')+'</div></div>';
+            '<div class="vid-dur">'+(post.midia.dur||'')+'</div>'+
+            '<div class="vid-views">👁 '+((post.midia.views||0)).toLocaleString('pt-BR')+'</div></div>';
         }
       }else if(post.midia.tipo==='fotos'&&post.midia.fotos){
         var fs=post.midia.fotos;
@@ -1044,12 +1011,13 @@ function screenJogadores(){
   NIV.forEach(function(f){o+='<button style="flex-shrink:0;border-radius:99px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;background:'+(S.jFN===f?'var(--gold)':'var(--card)')+';color:'+(S.jFN===f?'var(--bg)':'var(--text2)')+';border:1px solid '+(S.jFN===f?'var(--gold)':'var(--bord)')+'" onclick="setJFN(\''+f+'\')">'+f+'</button>';});
   o+='</div>';
   o+='<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="font-weight:800;font-size:12px;text-transform:uppercase">🏆 Ranking</span><span style="color:var(--muted);font-size:12px">'+filtrados.length+' jogadores</span></div>';
-  // PODIUM (only when no filters active and no search)
-  if(S.jFP==='Todos'&&S.jFN==='Todos'&&!S.jBusca){
+  // PODIUM (only when no filters active and no search and enough players)
+  if(S.jFP==='Todos'&&S.jFN==='Todos'&&!S.jBusca&&D.jogadores.length>=3){
+    var sorted=D.jogadores.slice().sort(function(a,b){return (b.gols*2+b.assist)-(a.gols*2+a.assist);});
     var top3=[
-      {j:D.jogadores[1],rank:2,h:68,cor:'#A8B5CC'},
-      {j:D.jogadores[0],rank:1,h:90,cor:'#FFBE00'},
-      {j:D.jogadores[6],rank:3,h:52,cor:'#FF7043'}
+      {j:sorted[1],rank:2,h:68,cor:'#A8B5CC'},
+      {j:sorted[0],rank:1,h:90,cor:'#FFBE00'},
+      {j:sorted[2],rank:3,h:52,cor:'#FF7043'}
     ];
     o+='<div class="podium">';
     top3.forEach(function(p){
@@ -1797,10 +1765,10 @@ function toggleDark() {
 
 /* ── AUTO NOTIF (simulated push) ───────────────── */
 var notifMessages = [
-  'Nova vaga: Leões do Cerrado busca Atacante 🦁',
+  
   'Seu jogo começa em 1 hora! ⚽',
-  'Arena Verde: 2 horários disponíveis hoje 🏟️',
-  'Rafael Costa te avaliou com ⭐⭐⭐⭐⭐',
+  
+  
   'Copa do Cerrado: inscrições encerram amanhã! 🏆'
 ];
 var notifIdx = 0;
@@ -1896,7 +1864,7 @@ function screenRanking() {
 /* ── SCREEN: HISTÓRICO ──────────────────────────── */
 function screenHistorico() {
   var reservas = [
-    {id:1, campo:'Arena Verde',    img:'🏟️',data:'Sáb 15/03',hora:'20:00',preco:120,status:'confirmada',jog:8},
+    
     {id:2, campo:'Campo do Cerrado',img:'⛳',data:'Ter 11/03',hora:'19:00',preco:90, status:'realizada', jog:6},
     {id:3, campo:'Estádio Central',  img:'🏆',data:'Dom 09/03',hora:'09:00',preco:150,status:'realizada', jog:10},
     {id:4, campo:'Quadra do Parque', img:'🌿',data:'Sex 07/03',hora:'18:00',preco:70, status:'cancelada', jog:5},
@@ -1969,19 +1937,7 @@ function ratingSetCrit(campoId, ci, nota) {
 }
 
 /* ── COMENTÁRIOS EXPANDIDOS ─────────────────────── */
-var fakeComments = {
-  1: [{av:'🎯',user:'Rafael Costa',   txt:'Jogo incrível mesmo! Estávamos 2x0 atrás e viramos 4x2!',hora:'1h'},
-      {av:'🛡️',user:'Pedro Alves',   txt:'Time demais! Defesa muito sólida hoje.',               hora:'1h30'}],
-  2: [{av:'🏟️',user:'Arena Verde',   txt:'Aproveite nosso desconto de 20% às terças!',           hora:'2h'},
-      {av:'⚡',user:'Carlos Lima',    txt:'Vou reservar hoje mesmo!',                              hora:'2h30'}],
-  3: [{av:'🔥',user:'Diego Nunes',   txt:'Quem se habilita? Prometo assistência garantida 😄',   hora:'5h'},
-      {av:'🌀',user:'Bruno Carvalho',txt:'Pode me colocar, jogo bem pelo lado!',                 hora:'5h30'}],
-  4: [{av:'💥',user:'Marcos Souza',  txt:'Que fase! Continue assim irmão 🔥',                    hora:'7h'},
-      {av:'🧤',user:'João Mendes',   txt:'Vai continuar esse ritmo no torneio?',                 hora:'8h'}],
-  5: [{av:'⛳',user:'Campo do Cerrado',txt:'Novo sistema LED já está funcionando 100%!',         hora:'9h'}],
-  6: [{av:'🛡️',user:'Pedro Alves',  txt:'Força time! Campeonato tá chegando.',                  hora:'1d'}],
-  7: [{av:'⚽',user:'Lucas Ferreira', txt:'Jogo de domingo vai ser épico!',                      hora:'1d'}],
-};
+var fakeComments = {};
 function openComments(postId) {
   S.comentando = postId;
   var comments = fakeComments[postId] || [];
