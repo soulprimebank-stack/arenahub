@@ -407,7 +407,15 @@ function openConfigs(){
 }
 function refreshBadges(){
   var av2=document.getElementById('top-av');
-  if(av2)av2.textContent=S.perfAv;
+  if(av2){
+    if(S.perfFotoUrl){
+      av2.innerHTML='<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+      av2.textContent='';
+    } else {
+      av2.innerHTML='';
+      av2.textContent=S.perfAv;
+    }
+  }
   var nb=document.getElementById('notif-nb');
   var nl2=D.notifs.filter(function(n){return !n.lida;}).length;
   if(nb)nb.textContent=nl2;
@@ -456,20 +464,23 @@ function openNotif(){
     '</div>'+rows+'<button class="btn bs bfw" style="margin-top:8px" onclick="closeModal()">Fechar</button>');
 }
 function openPerfil(){
+  var fotoHtml=S.perfFotoUrl
+    ?'<div style="width:72px;height:72px;border-radius:50%;overflow:hidden;margin:0 auto 11px;border:3px solid var(--green)"><img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover"></div>'
+    :av(S.perfAv,72,'var(--green)');
   showModal('<div style="text-align:center;margin-bottom:18px">'+
-    av(S.perfAv,72,'var(--green)')+
+    fotoHtml+
     '<div style="font-weight:900;font-size:20px;margin:11px 0 3px">'+esc(S.perfNome)+'</div>'+
     stars(4.7,13)+
     '<div style="display:flex;justify-content:center;gap:22px;margin-top:13px">'+
-    '<div style="text-align:center"><div style="color:var(--green);font-weight:900;font-size:17px">128</div><div style="color:var(--muted);font-size:11px">seguidores</div></div>'+
+    '<div style="text-align:center"><div style="color:var(--green);font-weight:900;font-size:17px">'+(D.feed.filter(function(p){return p.meu;}).length||0)+'</div><div style="color:var(--muted);font-size:11px">posts</div></div>'+
     '<div style="width:1px;background:var(--bord)"></div>'+
-    '<div style="text-align:center"><div style="color:var(--gold);font-weight:900;font-size:17px">12</div><div style="color:var(--muted);font-size:11px">gols</div></div>'+
+    '<div style="text-align:center"><div style="color:var(--gold);font-weight:900;font-size:17px">'+S.perfPos+'</div><div style="color:var(--muted);font-size:11px">posição</div></div>'+
     '<div style="width:1px;background:var(--bord)"></div>'+
-    '<div style="text-align:center"><div style="color:var(--blue);font-weight:900;font-size:17px">34</div><div style="color:var(--muted);font-size:11px">jogos</div></div>'+
-    '</div><div style="margin-top:11px">'+pl('Leões do Cerrado','#FFBE00')+'</div></div>'+
+    '<div style="text-align:center"><div style="color:var(--blue);font-weight:900;font-size:17px">'+S.perfNivel+'</div><div style="color:var(--muted);font-size:11px">nível</div></div>'+
+    '</div></div>'+
     '<div class="ps-grid">'+
-    [{l:'Posição',v:S.perfPos},{l:'Nível',v:S.perfNivel},{l:'Gols',v:'12'},{l:'Assistências',v:'18'}].map(function(s){
-      return '<div class="ps-card"><div style="color:var(--muted);font-size:11px">'+s.l+'</div><div style="color:var(--green);font-weight:900;font-size:17px;margin-top:3px">'+s.v+'</div></div>';
+    [{l:'Posição',v:S.perfPos},{l:'Nível',v:S.perfNivel},{l:'Cidade',v:S.perfCidade||'—'},{l:'Posts',v:D.feed.filter(function(p){return p.meu;}).length}].map(function(s){
+      return '<div class="ps-card"><div style="color:var(--muted);font-size:11px">'+s.l+'</div><div style="color:var(--green);font-weight:900;font-size:15px;margin-top:3px">'+s.v+'</div></div>';
     }).join('')+'</div>'+dv()+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();openEditPerfil()">✏️ Editar Perfil</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'historico\')">📅 Minhas Reservas</button>'+
@@ -478,6 +489,7 @@ function openPerfil(){
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();openConfigs()">⚙️ Configurações</button>'+
     '<button class="btn bd bfw" style="font-size:12px;padding:9px 0" onclick="doLogout()">Sair da conta</button>');
 }
+
 function openAdmin(){S.admin=true;S.adminAba='dashboard';render();sc();}
 function openPostModal(){S.pTipo='post';S.pTxt='';S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal();}
 function renderPostModal(){
@@ -486,24 +498,39 @@ function renderPostModal(){
   var midiaPreview='';
   if(S.pMidiaUrl){
     if(S.pMidiaTipo&&S.pMidiaTipo.startsWith('video')){
-      midiaPreview='<video src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:200px;margin-bottom:10px" controls></video>';
+      midiaPreview='<div style="position:relative;margin-bottom:12px"><video src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:200px" controls playsinline></video><button onclick="S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;font-size:14px;cursor:pointer">✕</button></div>';
     } else {
-      midiaPreview='<div style="position:relative;margin-bottom:10px"><img src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:200px;object-fit:cover"><button onclick="S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);border:none;color:#fff;border-radius:99px;width:26px;height:26px;font-size:14px;cursor:pointer">✕</button></div>';
+      midiaPreview='<div style="position:relative;margin-bottom:12px"><img src="'+S.pMidiaUrl+'" style="width:100%;border-radius:12px;max-height:240px;object-fit:cover"><button onclick="S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;font-size:14px;cursor:pointer">✕</button></div>';
     }
   }
-  showModal('<div style="font-weight:800;font-size:15px;margin:0 0 14px">📱 Nova publicação</div>'+
+  showModal(
+    '<div style="font-weight:800;font-size:15px;margin:0 0 14px">📱 Nova publicação</div>'+
     '<div class="ptyps">'+tybtns+'</div>'+
     '<textarea class="ptxt" id="ptxt" placeholder="O que está acontecendo no campo? 🏟️" style="min-height:90px">'+esc(S.pTxt)+'</textarea>'+
     midiaPreview+
-    '<div class="ugrid" style="margin-bottom:14px">'+
-    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="image/*" id="inp-foto" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">📷</div><div style="font-weight:700;font-size:12px">Foto</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
-    '<label class="ubox" style="cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center"><input type="file" accept="video/*" id="inp-video" style="display:none" onchange="handleMidiaUpload(this)"><div style="font-size:26px;margin-bottom:4px">🎬</div><div style="font-weight:700;font-size:12px">Vídeo</div><div style="color:var(--muted);font-size:10px;margin-top:2px">Câmera ou galeria</div></label>'+
-    '</div><div style="display:flex;gap:9px">'+
+    '<div style="margin-bottom:14px">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">📎 Mídia</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px">'+
+    '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 4px;cursor:pointer">'+
+    '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleMidiaUpload(this)">'+
+    '<div style="font-size:24px">📷</div><div style="font-size:9px;font-weight:700;text-align:center;color:var(--text2)">Câmera<br>Foto</div></label>'+
+    '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 4px;cursor:pointer">'+
+    '<input type="file" accept="video/*" capture="environment" style="display:none" onchange="handleMidiaUpload(this)">'+
+    '<div style="font-size:24px">🎬</div><div style="font-size:9px;font-weight:700;text-align:center;color:var(--text2)">Câmera<br>Vídeo</div></label>'+
+    '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 4px;cursor:pointer">'+
+    '<input type="file" accept="image/*" style="display:none" onchange="handleMidiaUpload(this)">'+
+    '<div style="font-size:24px">🖼️</div><div style="font-size:9px;font-weight:700;text-align:center;color:var(--text2)">Galeria<br>Foto</div></label>'+
+    '<label style="display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 4px;cursor:pointer">'+
+    '<input type="file" accept="video/*" style="display:none" onchange="handleMidiaUpload(this)">'+
+    '<div style="font-size:24px">📹</div><div style="font-size:9px;font-weight:700;text-align:center;color:var(--text2)">Galeria<br>Vídeo</div></label>'+
+    '</div></div>'+
+    '<div style="display:flex;gap:9px">'+
     '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn bp" style="flex:1" id="btn-publicar" onclick="publicarPost()">Publicar ✓</button>'+
     '</div>');
   setTimeout(function(){var el=document.getElementById('ptxt');if(el)el.addEventListener('input',function(e){S.pTxt=e.target.value;});},50);
 }
+
 function handleMidiaUpload(input){
   var file=input.files[0];
   if(!file)return;
@@ -545,30 +572,74 @@ function publicarPost(){
   toast('Publicado! ✓ 🎉');
 }
 function openEditPerfil(){
-  var avatars=['🧑','⚽','🎯','🛡️','🧤','⚡','💥','🔥','🌀','👑','💎','🦁'];
+  var avatarEmojis=['🧑','⚽','🎯','🛡️','🧤','⚡','💥','🔥','🌀','👑','💎','🦁'];
+  var fotoAtual=S.perfFotoUrl||'';
   var o='<div style="font-weight:800;font-size:16px;margin:0 0 18px">✏️ Editar Perfil</div>';
+
+  // Foto de perfil real
+  o+='<div class="fg"><label class="fl" style="margin-bottom:10px">📸 Foto de Perfil</label>';
+  o+='<div style="display:flex;flex-direction:column;align-items:center;gap:12px">';
+  // Preview foto atual
+  if(fotoAtual){
+    o+='<div style="position:relative;width:88px;height:88px"><img src="'+fotoAtual+'" style="width:88px;height:88px;border-radius:50%;object-fit:cover;border:3px solid var(--green)"><button onclick="S.perfFotoUrl=null;openEditPerfil()" style="position:absolute;top:-4px;right:-4px;background:var(--red);border:none;color:#fff;border-radius:99px;width:22px;height:22px;font-size:12px;cursor:pointer">✕</button></div>';
+  } else {
+    o+='<div style="width:88px;height:88px;border-radius:50%;background:var(--surf);border:2px dashed var(--bord);display:flex;align-items:center;justify-content:center;font-size:36px">'+( S.perfAv||'🧑')+'</div>';
+  }
+  // Botões câmera e galeria
+  o+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%">';
+  o+='<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 5px;cursor:pointer"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleFotoPerfil(this)"><div style="font-size:22px">📷</div><div style="font-size:10px;font-weight:700;text-align:center">Câmera<br>Traseira</div></label>';
+  o+='<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 5px;cursor:pointer"><input type="file" accept="image/*" capture="user" style="display:none" onchange="handleFotoPerfil(this)"><div style="font-size:22px">🤳</div><div style="font-size:10px;font-weight:700;text-align:center">Câmera<br>Frontal</div></label>';
+  o+='<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:10px 5px;cursor:pointer"><input type="file" accept="image/*" style="display:none" onchange="handleFotoPerfil(this)"><div style="font-size:22px">🖼️</div><div style="font-size:10px;font-weight:700;text-align:center">Da<br>Galeria</div></label>';
+  o+='</div></div></div>';
+
   o+='<div class="fg"><label class="fl">Nome</label><input class="fi" id="ep-nome" value="'+esc(S.perfNome)+'" placeholder="Seu nome..."></div>';
   o+='<div class="fg"><label class="fl">Posição</label><select class="fi" id="ep-pos">';
   ['GOL','ZAG','LAT','VOL','MEI','ATA','PNT','JUI'].forEach(function(p){o+='<option'+(S.perfPos===p?' selected':'')+'>'+p+'</option>';});
   o+='</select></div><div class="fg"><label class="fl">Nível</label><select class="fi" id="ep-nivel">';
   ['Iniciante','Intermediário','Avançado','Profissional'].forEach(function(p){o+='<option'+(S.perfNivel===p?' selected':'')+'>'+p+'</option>';});
-  o+='</select></div><div class="fg"><label class="fl">Cidade</label><input class="fi" id="ep-cidade" value="'+esc(S.perfCidade)+'" placeholder="Ex: Goiânia"></div>';
-  o+='<div class="fg"><label class="fl" style="margin-bottom:10px">Avatar</label><div style="display:flex;gap:8px;flex-wrap:wrap">';
-  avatars.forEach(function(e){o+='<button class="av-opt'+(S.perfAv===e?' sel':'')+'" onclick="S.perfAv=\''+e+'\';openEditPerfil()">'+e+'</button>';});
-  o+='</div></div>'+dv()+'<div style="display:flex;gap:9px">'+
+  o+='</select></div><div class="fg"><label class="fl">Cidade</label><input class="fi" id="ep-cidade" value="'+esc(S.perfCidade||'')+'" placeholder="Ex: Goiânia"></div>';
+
+  // Emoji avatar (alternativa à foto)
+  if(!fotoAtual){
+    o+='<div class="fg"><label class="fl" style="margin-bottom:10px">Ou escolha um avatar</label><div style="display:flex;gap:8px;flex-wrap:wrap">';
+    avatarEmojis.forEach(function(e){o+='<button class="av-opt'+(S.perfAv===e?' sel':'')+'" onclick="S.perfAv=\''+e+'\';openEditPerfil()">'+e+'</button>';});
+    o+='</div></div>';
+  }
+
+  o+=dv()+'<div style="display:flex;gap:9px">'+
     '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>'+
     '<button class="btn bp" style="flex:1" onclick="salvarPerfil()">Salvar ✓</button></div>';
   showModal(o);
+}
+function handleFotoPerfil(input){
+  var file=input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    S.perfFotoUrl=e.target.result;
+    openEditPerfil();
+    toast('Foto carregada! ✓');
+  };
+  reader.readAsDataURL(file);
 }
 function salvarPerfil(){
   var nm=document.getElementById('ep-nome');
   var ps=document.getElementById('ep-pos');
   var nv=document.getElementById('ep-nivel');
   var cd=document.getElementById('ep-cidade');
-  if(nm&&nm.value)S.perfNome=nm.value;
+  if(nm&&nm.value.trim())S.perfNome=nm.value.trim();
   if(ps)S.perfPos=ps.value;
   if(nv)S.perfNivel=nv.value;
-  if(cd&&cd.value)S.perfCidade=cd.value;
+  if(cd&&cd.value.trim())S.perfCidade=cd.value.trim();
+  // Atualiza display name no Firebase se disponível
+  try{
+    var auth=firebase.auth(firebase.app('arenahub'));
+    if(auth.currentUser){
+      var upd={displayName:S.perfNome};
+      if(S.perfFotoUrl&&S.perfFotoUrl.startsWith('http'))upd.photoURL=S.perfFotoUrl;
+      auth.currentUser.updateProfile(upd);
+    }
+  }catch(e){}
   closeModal();toast('Perfil atualizado! ✓');render();
 }
 
