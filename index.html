@@ -13,6 +13,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#07090F;--bg2:#0C0F1A;--surf:#111520;--card:#151B28;--cardhi:#1C2438;--bord:#1E2D45;--green:#00F082;--gold:#FFBE00;--orange:#FF7043;--red:#FF4060;--blue:#4D9EFF;--purple:#B06EFF;--teal:#00D4C8;--pink:#FF4D8D;--text:#EEF2FF;--text2:#A0AECB;--muted:#4E6080;--muted2:#2A3A52;--greenglow:rgba(0,240,130,.14);}
 html.light{--bg:#F4F6FA;--bg2:#EAECF2;--surf:#FFFFFF;--card:#FFFFFF;--cardhi:#F0F2F8;--bord:#D8DCE8;--text:#111827;--text2:#4B5563;--muted:#9CA3AF;--muted2:#D1D5DB;--greenglow:rgba(0,180,100,.1);}
@@ -548,28 +549,48 @@ function publicarPost(){
   var midia=null;
   if(S.pMidiaUrl){
     if(S.pMidiaTipo&&S.pMidiaTipo.startsWith('video')){
-      midia={tipo:'video',url:S.pMidiaUrl,thumb:'🎬',dur:'',views:0};
+      midia={tipo:'video',url:S.pMidiaUrl};
     } else {
       midia={tipo:'foto',url:S.pMidiaUrl};
     }
   }
   var novoPost={
-    id:Date.now(),
     user:S.perfNome||'Usuário',
     time:S.perfTime||'',
     txt:txt.trim(),
     likes:0,coments:0,
-    hora:'agora',
     tipo:S.pTipo,
-    av:S.perfAv||'🧑',
-    midia:midia,
-    meu:true
+    av:S.perfFotoUrl||S.perfAv||'🧑',
+    avatarTipo: S.perfFotoUrl?'foto':'emoji',
+    uid:S.fbUser?S.fbUser.uid:'',
+    midia:midia
   };
-  D.feed.unshift(novoPost);
   S.pTxt='';S.pMidiaUrl=null;S.pMidiaTipo=null;
   closeModal();
-  render();
-  toast('Publicado! ✓ 🎉');
+
+  // Salva no Firestore — o listener onSnapshot atualiza o feed em TODOS os dispositivos
+  if(_fbDb){
+    var postData=Object.assign({},novoPost);
+    postData.timestamp=firebase.firestore.FieldValue.serverTimestamp();
+    // Imagem base64: limita tamanho (Firestore max 1MB por doc)
+    if(postData.midia&&postData.midia.url&&postData.midia.url.length>800000){
+      postData.midia.url=postData.midia.url.substring(0,800000);
+    }
+    _fbDb.collection('posts').add(postData)
+      .then(function(){toast('Publicado! ✓ 🎉');})
+      .catch(function(err){
+        toast('Erro ao publicar: '+err.message);
+        console.warn(err);
+      });
+  } else {
+    // Fallback local se Firestore não disponível
+    novoPost.id=Date.now();
+    novoPost.hora='agora';
+    novoPost.meu=true;
+    D.feed.unshift(novoPost);
+    render();
+    toast('Publicado localmente ✓');
+  }
 }
 function openEditPerfil(){
   var avatarEmojis=['🧑','⚽','🎯','🛡️','🧤','⚡','💥','🔥','🌀','👑','💎','🦁'];
@@ -644,7 +665,8 @@ function salvarPerfil(){
 }
 
 /* ── FIREBASE AUTH ────────────────────────────────── */
-var _fbApp=null,_fbAuth=null;
+var _fbApp=null,_fbAuth=null,_fbDb=null,_feedUnsub=null;
+
 function _initFirebase(){
   if(_fbAuth)return _fbAuth;
   try{
@@ -662,6 +684,8 @@ function _initFirebase(){
   }
   _fbAuth=firebase.auth(_fbApp);
   _fbAuth.languageCode='pt-BR';
+  // Inicializa Firestore
+  _fbDb=firebase.firestore(_fbApp);
   _fbAuth.onAuthStateChanged(function(user){
     if(user){
       S.logado=true;
@@ -669,9 +693,81 @@ function _initFirebase(){
       S.perfNome=user.displayName||user.email.split('@')[0];
       S.perfEmail=user.email;
       render();
+      // Inicia escuta do feed em tempo real
+      _iniciarFeedRealtime();
+    } else {
+      // Para escuta quando deslogar
+      if(_feedUnsub){_feedUnsub();_feedUnsub=null;}
     }
   });
   return _fbAuth;
+}
+
+/* ── FIRESTORE — FEED TEMPO REAL ─────────────────── */
+function _iniciarFeedRealtime(){
+  if(!_fbDb)return;
+  if(_feedUnsub){_feedUnsub();} // cancela listener anterior
+  // Escuta os últimos 50 posts em tempo real, ordenados por data
+  _feedUnsub=_fbDb.collection('posts')
+    .orderBy('timestamp','desc')
+    .limit(50)
+    .onSnapshot(function(snapshot){
+      var posts=[];
+      snapshot.forEach(function(doc){
+        var d=doc.data();
+        d.id=doc.id;
+        // Calcula tempo relativo
+        d.hora=_tempoRelativo(d.timestamp);
+        posts.push(d);
+      });
+      D.feed=posts;
+      render();
+    },function(err){
+      console.warn('Feed error:',err.message);
+    });
+}
+
+function _tempoRelativo(ts){
+  if(!ts)return 'agora';
+  var agora=Date.now();
+  var t=ts.toMillis?ts.toMillis():ts;
+  var diff=Math.floor((agora-t)/1000);
+  if(diff<60)return 'agora';
+  if(diff<3600)return Math.floor(diff/60)+'min';
+  if(diff<86400)return Math.floor(diff/3600)+'h';
+  return Math.floor(diff/86400)+'d';
+}
+
+function _salvarPostFirestore(post, callback){
+  if(!_fbDb){callback&&callback();return;}
+  // Remove campos não serializáveis
+  var postData={
+    user:post.user||'',
+    time:post.time||'',
+    txt:post.txt||'',
+    tipo:post.tipo||'post',
+    av:post.av||'🧑',
+    uid:S.fbUser?S.fbUser.uid:'',
+    likes:0,
+    coments:0,
+    timestamp:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  // Só salva URL de mídia se for uma URL real (não base64 enorme)
+  if(post.midia){
+    if(post.midia.tipo==='foto'&&post.midia.url){
+      // Base64 é grande demais pro Firestore (limite 1MB por doc)
+      // Por agora salva indicador, futuramente usar Storage
+      postData.midia={tipo:'foto',url:post.midia.url.substring(0,500000)};
+    } else if(post.midia.tipo==='video'&&post.midia.url){
+      postData.midia={tipo:'video',url:post.midia.url.substring(0,500000)};
+    }
+  }
+  _fbDb.collection('posts').add(postData)
+    .then(function(){callback&&callback();})
+    .catch(function(err){
+      console.warn('Erro ao salvar post:',err.message);
+      callback&&callback();
+    });
 }
 
 /* ── LOGIN ACTIONS ────────────────────────────────── */
@@ -800,6 +896,22 @@ function doLoginGoogle(){
 
 /* ── FEED ACTIONS ─────────────────────────────────── */
 function toggleCurtir(id){S.curtidos[id]=!S.curtidos[id];render();}
+function openPostOpts(id,isMeu){
+  var o='<div style="font-weight:800;font-size:15px;margin:0 0 16px">Opções</div>';
+  if(isMeu){
+    o+='<button class="btn bd bfw" style="margin-bottom:9px" onclick="deletarPost(\''+id+'\')">🗑️ Apagar publicação</button>';
+  }
+  o+='<button class="btn bs bfw" onclick="closeModal()">Fechar</button>';
+  showModal(o);
+}
+function deletarPost(id){
+  closeModal();
+  if(!_fbDb){toast('Sem conexão');return;}
+  if(!confirm('Apagar esta publicação?'))return;
+  _fbDb.collection('posts').doc(id).delete()
+    .then(function(){toast('Post apagado ✓');})
+    .catch(function(err){toast('Erro: '+err.message);});
+}
 function toggleSalvar(id){S.salvos[id]=!S.salvos[id];render();}
 function toggleComentar(id){S.comentando=S.comentando===id?null:id;render();}
 function toggleVideo(id){S.vplay=S.vplay===id?null:id;render();}
@@ -1037,10 +1149,19 @@ function screenSocial(){
       }
     }
     o+='<div class="post">';
-    o+='<div class="post-hd">'+av(post.av,40,cor)+
-      '<div style="flex:1;min-width:0;margin-left:1px"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="post-name">'+esc(post.user)+'</span>'+pl(TLBL[post.tipo],cor)+'</div>'+
-      '<div class="post-meta">'+esc(post.time)+' · '+post.hora+'</div></div>'+
-      '<button style="background:none;border:none;color:var(--muted);font-size:19px;padding:0 3px;cursor:pointer">···</button></div>';
+    // Avatar: foto real ou emoji
+    var postAvHtml;
+    if(post.avatarTipo==='foto'&&post.av&&post.av.startsWith('data:')){
+      postAvHtml='<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid '+cor+'"><img src="'+post.av+'" style="width:100%;height:100%;object-fit:cover"></div>';
+    } else {
+      postAvHtml=av(post.av,40,cor);
+    }
+    // Marca post do usuário atual
+    var isMeu=S.fbUser&&post.uid===S.fbUser.uid;
+    o+='<div class="post-hd">'+postAvHtml+
+      '<div style="flex:1;min-width:0;margin-left:1px"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="post-name">'+esc(post.user)+'</span>'+pl(TLBL[post.tipo]||post.tipo,cor)+(isMeu?'<span style="font-size:9px;color:var(--muted)">você</span>':'')+'</div>'+
+      '<div class="post-meta">'+( post.time?esc(post.time)+' · ':'')+( post.hora||'agora')+'</div></div>'+
+      '<button style="background:none;border:none;color:var(--muted);font-size:19px;padding:0 3px;cursor:pointer" onclick="openPostOpts(\''+post.id+'\','+isMeu+')">···</button></div>';
     o+='<p class="post-txt">'+esc(post.txt)+'</p>';
     o+=midia;
     o+='<div class="pacts">'+
