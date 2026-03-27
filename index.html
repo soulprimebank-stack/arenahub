@@ -536,9 +536,35 @@ function handleMidiaUpload(input){
   var file=input.files[0];
   if(!file)return;
   S.pMidiaTipo=file.type;
-  var reader=new FileReader();
-  reader.onload=function(e){S.pMidiaUrl=e.target.result;renderPostModal();};
-  reader.readAsDataURL(file);
+
+  // Comprime imagem antes de salvar (max 800px, qualidade 0.7)
+  if(file.type.startsWith('image/')){
+    var img=new Image();
+    var reader=new FileReader();
+    reader.onload=function(e){
+      img.onload=function(){
+        var canvas=document.createElement('canvas');
+        var maxSize=800;
+        var w=img.width, h=img.height;
+        if(w>maxSize||h>maxSize){
+          if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}
+          else{w=Math.round(w*maxSize/h);h=maxSize;}
+        }
+        canvas.width=w;canvas.height=h;
+        var ctx=canvas.getContext('2d');
+        ctx.drawImage(img,0,0,w,h);
+        S.pMidiaUrl=canvas.toDataURL('image/jpeg',0.75);
+        renderPostModal();
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    // Vídeo — lê direto
+    var reader2=new FileReader();
+    reader2.onload=function(e){S.pMidiaUrl=e.target.result;renderPostModal();};
+    reader2.readAsDataURL(file);
+  }
 }
 function publicarPost(){
   var el=document.getElementById('ptxt');
@@ -635,11 +661,27 @@ function openEditPerfil(){
 function handleFotoPerfil(input){
   var file=input.files[0];
   if(!file)return;
+  var img=new Image();
   var reader=new FileReader();
   reader.onload=function(e){
-    S.perfFotoUrl=e.target.result;
-    openEditPerfil();
-    toast('Foto carregada! ✓');
+    img.onload=function(){
+      // Comprime para 300x300 (avatar de perfil)
+      var canvas=document.createElement('canvas');
+      var size=300;
+      var w=img.width,h=img.height;
+      // Crop quadrado centralizado
+      var min=Math.min(w,h);
+      var sx=(w-min)/2, sy=(h-min)/2;
+      canvas.width=size;canvas.height=size;
+      var ctx=canvas.getContext('2d');
+      ctx.drawImage(img,sx,sy,min,min,0,0,size,size);
+      S.perfFotoUrl=canvas.toDataURL('image/jpeg',0.85);
+      // Atualiza topbar imediatamente
+      refreshBadges();
+      toast('Foto carregada! ✓');
+      openEditPerfil();
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -895,7 +937,19 @@ function doLoginGoogle(){
 }
 
 /* ── FEED ACTIONS ─────────────────────────────────── */
-function toggleCurtir(id){S.curtidos[id]=!S.curtidos[id];render();}
+function toggleCurtir(id){
+  // Converte para string para garantir compatibilidade com IDs do Firestore
+  var sid = String(id);
+  S.curtidos[sid]=!S.curtidos[sid];
+  // Atualiza likes no Firestore
+  if(_fbDb){
+    var delta = S.curtidos[sid] ? 1 : -1;
+    _fbDb.collection('posts').doc(sid).update({
+      likes: firebase.firestore.FieldValue.increment(delta)
+    }).catch(function(){});
+  }
+  render();
+}
 function openPostOpts(id,isMeu){
   var o='<div style="font-weight:800;font-size:15px;margin:0 0 16px">Opções</div>';
   if(isMeu){
@@ -1114,8 +1168,8 @@ function screenSocial(){
   }
   feed.forEach(function(post){
     var cor=TCOR[post.tipo]||'#4E6080';
-    var curtido=S.curtidos[post.id];
-    var salvo=S.salvos[post.id];
+    var curtido=S.curtidos[String(post.id)];
+    var salvo=S.salvos[String(post.id)];
     var coment=S.comentando===post.id;
     var playing=S.vplay===post.id;
     var midia='';
@@ -1164,12 +1218,13 @@ function screenSocial(){
       '<button style="background:none;border:none;color:var(--muted);font-size:19px;padding:0 3px;cursor:pointer" onclick="openPostOpts(\''+post.id+'\','+isMeu+')">···</button></div>';
     o+='<p class="post-txt">'+esc(post.txt)+'</p>';
     o+=midia;
+    var pid = "'" + post.id + "'";
     o+='<div class="pacts">'+
-      '<button class="pa" onclick="toggleCurtir('+post.id+')" style="color:'+(curtido?'var(--red)':'var(--muted)')+'"><span class="pi">'+(curtido?'❤️':'🤍')+'</span>'+(post.likes+(curtido?1:0))+'</button>'+
-      '<button class="pa" onclick="openComments('+post.id+')" style="color:var(--muted)"><span class="pi">💬</span>'+post.coments+'</button>'+
+      '<button class="pa" onclick="toggleCurtir('+pid+')" style="color:'+(curtido?'var(--red)':'var(--muted)')+'"><span class="pi">'+(curtido?'❤️':'🤍')+'</span>'+(post.likes+(curtido?1:0))+'</button>'+
+      '<button class="pa" onclick="openComments('+pid+')" style="color:var(--muted)"><span class="pi">💬</span>'+(post.coments||0)+'</button>'+
       '<button class="pa"><span class="pi">↗️</span>Compartilhar</button>'+
       '<div style="flex:1"></div>'+
-      '<button class="pa" onclick="toggleSalvar('+post.id+')" style="color:'+(salvo?'var(--gold)':'var(--muted)')+'"><span class="pi">'+(salvo?'🔖':'🏷️')+'</span></button>'+
+      '<button class="pa" onclick="toggleSalvar('+pid+')" style="color:'+(salvo?'var(--gold)':'var(--muted)')+'"><span class="pi">'+(salvo?'🔖':'🏷️')+'</span></button>'+
       '</div>';
     if(coment){
       o+='<div class="cbox"><div class="crow">'+av('🧑',28)+
@@ -2129,40 +2184,92 @@ function ratingSetCrit(campoId, ci, nota) {
 }
 
 /* ── COMENTÁRIOS EXPANDIDOS ─────────────────────── */
-var fakeComments = {};
+// Comentários em memória (cache local)
+var _comentariosCache = {};
+
 function openComments(postId) {
   S.comentando = postId;
-  var comments = fakeComments[postId] || [];
+  var comments = _comentariosCache[postId] || [];
+
+  // Carrega do Firestore se disponível
+  if(_fbDb && !_comentariosCache[postId]){
+    _fbDb.collection('posts').doc(postId).collection('comentarios')
+      .orderBy('timestamp','asc').limit(50)
+      .get().then(function(snap){
+        var cms = [];
+        snap.forEach(function(doc){
+          var d = doc.data();
+          d.id = doc.id;
+          cms.push(d);
+        });
+        _comentariosCache[postId] = cms;
+        openComments(postId); // re-abre com dados
+      }).catch(function(){});
+  }
+
   var o = '<div style="font-weight:800;font-size:16px;margin:0 0 16px">💬 Comentários</div>';
-  if (comments.length === 0) {
-    o += '<div class="empty" style="padding:20px 0">Sem comentários ainda. Seja o primeiro! 💬</div>';
+  if(comments.length === 0){
+    o += '<div class="empty" style="padding:20px 0;color:var(--muted)">Sem comentários ainda. Seja o primeiro! 💬</div>';
   } else {
-    comments.forEach(function(cm) {
+    comments.forEach(function(cm){
+      var avHtml = (cm.avatarTipo==='foto'&&cm.av&&cm.av.startsWith('data:'))
+        ? '<div style="width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+cm.av+'" style="width:100%;height:100%;object-fit:cover"></div>'
+        : av(cm.av||'🧑', 34);
       o += '<div style="display:flex;gap:9px;margin-bottom:13px">';
-      o += av(cm.av, 34);
+      o += avHtml;
       o += '<div style="flex:1;background:var(--surf);border-radius:0 13px 13px 13px;padding:9px 12px">';
-      o += '<div style="font-weight:700;font-size:12px;margin-bottom:3px">' + esc(cm.user) + '<span style="color:var(--muted);font-weight:400;margin-left:7px">' + cm.hora + '</span></div>';
-      o += '<div style="font-size:13px;line-height:1.5">' + esc(cm.txt) + '</div></div></div>';
+      o += '<div style="font-weight:700;font-size:12px;margin-bottom:3px">'+esc(cm.user)+'<span style="color:var(--muted);font-weight:400;margin-left:7px">'+( cm.hora||'agora')+'</span></div>';
+      o += '<div style="font-size:13px;line-height:1.5">'+esc(cm.txt)+'</div></div></div>';
     });
   }
   o += dv();
   o += '<div style="display:flex;gap:8px"><input id="cmt-inp" class="fi" style="flex:1;padding:9px 13px" placeholder="Adicionar comentário...">';
-  o += '<button class="btn bp bsm" onclick="sendComment(' + postId + ')">Enviar</button></div>';
+  o += '<button class="btn bp bsm" onclick="sendComment(\'' + postId + '\')">Enviar</button></div>';
   showModal(o);
-  setTimeout(function() {
+  setTimeout(function(){
     var el = document.getElementById('cmt-inp');
-    if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') sendComment(postId); });
+    if(el) el.addEventListener('keydown', function(e){ if(e.key==='Enter') sendComment(postId); });
   }, 50);
 }
+
 function sendComment(postId) {
   var inp = document.getElementById('cmt-inp');
-  if (!inp || !inp.value.trim()) return;
-  if (!fakeComments[postId]) fakeComments[postId] = [];
-  fakeComments[postId].push({av: S.perfAv, user: S.perfNome, txt: inp.value, hora: 'agora'});
-  for (var i = 0; i < D.feed.length; i++) { if (D.feed[i].id === postId) { D.feed[i].coments++; break; } }
+  if(!inp || !inp.value.trim()) return;
+  var txt = inp.value.trim();
   inp.value = '';
+
+  var novoComent = {
+    av: S.perfFotoUrl||S.perfAv||'🧑',
+    avatarTipo: S.perfFotoUrl?'foto':'emoji',
+    user: S.perfNome||'Usuário',
+    txt: txt,
+    hora: 'agora',
+    uid: S.fbUser?S.fbUser.uid:'',
+    timestamp: null
+  };
+
+  // Adiciona no cache local imediatamente
+  if(!_comentariosCache[postId]) _comentariosCache[postId] = [];
+  _comentariosCache[postId].push(novoComent);
+
+  // Atualiza contador no feed local
+  for(var i=0;i<D.feed.length;i++){
+    if(D.feed[i].id===postId){ D.feed[i].coments=(D.feed[i].coments||0)+1; break; }
+  }
+
   openComments(postId);
   render();
+
+  // Salva no Firestore
+  if(_fbDb){
+    var data = Object.assign({}, novoComent);
+    data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
+    _fbDb.collection('posts').doc(postId).collection('comentarios').add(data);
+    // Incrementa contador no post
+    _fbDb.collection('posts').doc(postId).update({
+      coments: firebase.firestore.FieldValue.increment(1)
+    }).catch(function(){});
+  }
 }
 
 /* ── BOOT ───────────────────────────────────────── */
