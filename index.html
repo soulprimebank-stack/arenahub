@@ -407,6 +407,7 @@ function openConfigs(){
   showModal(o);
 }
 function refreshBadges(){
+  // Atualiza avatar no topbar
   var av2=document.getElementById('top-av');
   if(av2){
     if(S.perfFotoUrl){
@@ -416,6 +417,20 @@ function refreshBadges(){
       av2.innerHTML='';
       av2.textContent=S.perfAv;
     }
+  }
+  // Atualiza story "Você" se existir no DOM
+  var storyVoce=document.querySelector('.stor-av');
+  if(storyVoce){
+    if(S.perfFotoUrl){
+      storyVoce.innerHTML='<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    } else {
+      storyVoce.textContent=S.perfAv;
+    }
+  }
+  // Atualiza D.stories[0] (seu story "Você")
+  if(D.stories&&D.stories[0]&&D.stories[0].add){
+    D.stories[0].av=S.perfFotoUrl||S.perfAv||'🧑';
+    D.stories[0].fotoUrl=S.perfFotoUrl||null;
   }
   var nb=document.getElementById('notif-nb');
   var nl2=D.notifs.filter(function(n){return !n.lida;}).length;
@@ -703,7 +718,11 @@ function salvarPerfil(){
       auth.currentUser.updateProfile(upd);
     }
   }catch(e){}
-  closeModal();toast('Perfil atualizado! ✓');render();
+  // Atualiza topbar imediatamente
+  refreshBadges();
+  closeModal();
+  toast('Perfil atualizado! ✓');
+  render();
 }
 
 /* ── FIREBASE AUTH ────────────────────────────────── */
@@ -748,24 +767,51 @@ function _initFirebase(){
 /* ── FIRESTORE — FEED TEMPO REAL ─────────────────── */
 function _iniciarFeedRealtime(){
   if(!_fbDb)return;
-  if(_feedUnsub){_feedUnsub();} // cancela listener anterior
-  // Escuta os últimos 50 posts em tempo real, ordenados por data
+  if(_feedUnsub){_feedUnsub();}
   _feedUnsub=_fbDb.collection('posts')
     .orderBy('timestamp','desc')
     .limit(50)
-    .onSnapshot(function(snapshot){
-      var posts=[];
-      snapshot.forEach(function(doc){
-        var d=doc.data();
-        d.id=doc.id;
-        // Calcula tempo relativo
+    .onSnapshot({includeMetadataChanges:false}, function(snapshot){
+      // Usa docChanges para atualizar apenas o que mudou (mais eficiente)
+      snapshot.docChanges().forEach(function(change){
+        var d=change.doc.data();
+        d.id=change.doc.id;
         d.hora=_tempoRelativo(d.timestamp);
-        posts.push(d);
+        if(change.type==='added'){
+          // Adiciona post novo no início se não existe
+          var existe=D.feed.some(function(p){return p.id===d.id;});
+          if(!existe) D.feed.unshift(d);
+          else {
+            // Atualiza post existente preservando curtidas locais
+            for(var i=0;i<D.feed.length;i++){
+              if(D.feed[i].id===d.id){D.feed[i]=d;break;}
+            }
+          }
+        } else if(change.type==='modified'){
+          // Atualiza campos como likes e coments em tempo real
+          for(var i=0;i<D.feed.length;i++){
+            if(D.feed[i].id===d.id){D.feed[i]=d;break;}
+          }
+        } else if(change.type==='removed'){
+          D.feed=D.feed.filter(function(p){return p.id!==d.id;});
+        }
       });
-      D.feed=posts;
+      // Mantém ordem por timestamp
+      D.feed.sort(function(a,b){
+        var ta=a.timestamp?a.timestamp.toMillis?a.timestamp.toMillis():a.timestamp:0;
+        var tb=b.timestamp?b.timestamp.toMillis?b.timestamp.toMillis():b.timestamp:0;
+        return tb-ta;
+      });
       render();
     },function(err){
       console.warn('Feed error:',err.message);
+      // Fallback: relê tudo
+      _fbDb.collection('posts').orderBy('timestamp','desc').limit(50).get()
+        .then(function(snap){
+          var posts=[];
+          snap.forEach(function(doc){var d=doc.data();d.id=doc.id;d.hora=_tempoRelativo(d.timestamp);posts.push(d);});
+          D.feed=posts;render();
+        });
     });
 }
 
@@ -848,27 +894,6 @@ function doLogin(){
     });
 }
 
-function doDemo(){
-  var auth=_initFirebase();
-  auth.signInAnonymously()
-    .then(function(cred){
-      S.logado=true;
-      S.fbUser=cred.user;
-      S.perfNome='Visitante';
-      render();
-      toast('Modo visitante ativado 🎮');
-      checkOnboarding();
-    })
-    .catch(function(){
-      // Fallback offline
-      S.logado=true;
-      S.perfNome='Visitante';
-      render();
-      toast('Modo visitante ativado 🎮');
-      checkOnboarding();
-    });
-}
-
 function doCadastro(){
   var nm=document.getElementById('cad-nome');
   var em=document.getElementById('cad-email');
@@ -938,17 +963,32 @@ function doLoginGoogle(){
 
 /* ── FEED ACTIONS ─────────────────────────────────── */
 function toggleCurtir(id){
-  // Converte para string para garantir compatibilidade com IDs do Firestore
-  var sid = String(id);
-  S.curtidos[sid]=!S.curtidos[sid];
-  // Atualiza likes no Firestore
-  if(_fbDb){
-    var delta = S.curtidos[sid] ? 1 : -1;
-    _fbDb.collection('posts').doc(sid).update({
-      likes: firebase.firestore.FieldValue.increment(delta)
-    }).catch(function(){});
+  var sid=String(id);
+  if(!_fbDb){
+    // Sem conexão: local apenas
+    S.curtidos[sid]=!S.curtidos[sid];
+    render();
+    return;
   }
-  render();
+  // Evita duplo clique
+  if(S._curtindoId===sid)return;
+  S._curtindoId=sid;
+  var jaLikei=!!S.curtidos[sid];
+  var delta=jaLikei?-1:1;
+  S.curtidos[sid]=!jaLikei;
+  render(); // atualiza UI imediatamente
+  _fbDb.collection('posts').doc(sid).update({
+    likes:firebase.firestore.FieldValue.increment(delta)
+  }).then(function(){
+    S._curtindoId=null;
+    // O onSnapshot vai atualizar o valor real automaticamente
+  }).catch(function(err){
+    // Reverte se der erro
+    S.curtidos[sid]=jaLikei;
+    S._curtindoId=null;
+    render();
+    toast('Erro ao curtir');
+  });
 }
 function openPostOpts(id,isMeu){
   var o='<div style="font-weight:800;font-size:15px;margin:0 0 16px">Opções</div>';
@@ -1045,7 +1085,7 @@ function screenLogin(){
     o+='<button class="btn bp bfw blg" onclick="doCadastro()">Criar Conta</button>';
   }
   o+='<div class="login-div"><div class="login-div-line"></div><span class="login-div-txt">ou continue com</span><div class="login-div-line"></div></div>';
-  o+='<div class="login-soc"><button class="login-soc-btn" onclick="doDemo()">🎮 Visitante</button><button class="login-soc-btn" onclick="doLoginGoogle()"><span style="font-weight:900;font-size:14px;color:#4285F4">G</span> Google</button></div>';
+  o+='<div class="login-soc" style="grid-template-columns:1fr"><button class="login-soc-btn" onclick="doLoginGoogle()"><span style="font-weight:900;font-size:14px;color:#4285F4">G</span> Google</button></div>';
   o+='</div></div>';
   return o;
 }
@@ -1152,7 +1192,14 @@ function screenSocial(){
   D.stories.forEach(function(s){
     var click=s.add?'openPostModal()':'setStVisto('+s.id+')';
     var ring=s.add?'':S.stVisto[s.id]?'background:var(--muted2)':'background:linear-gradient(135deg,'+s.cor+')';
-    o+='<div class="stor" onclick="'+click+'"><div class="stor-ring" style="'+ring+'"><div class="stor-av">'+s.av+'</div></div>';
+    // Se é o story "Você" (add=true) e tem foto, mostra a foto
+    var avContent;
+    if(s.add&&S.perfFotoUrl){
+      avContent='<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    } else {
+      avContent=s.av;
+    }
+    o+='<div class="stor" onclick="'+click+'"><div class="stor-ring" style="'+ring+'"><div class="stor-av">'+avContent+'</div></div>';
     o+='<span class="stor-lb" style="color:'+(S.stVisto[s.id]?'var(--muted)':'var(--text2)')+'">'+esc(s.user)+'</span></div>';
   });
   o+='</div>';
@@ -1220,7 +1267,7 @@ function screenSocial(){
     o+=midia;
     var pid = "'" + post.id + "'";
     o+='<div class="pacts">'+
-      '<button class="pa" onclick="toggleCurtir('+pid+')" style="color:'+(curtido?'var(--red)':'var(--muted)')+'"><span class="pi">'+(curtido?'❤️':'🤍')+'</span>'+(post.likes+(curtido?1:0))+'</button>'+
+      '<button class="pa" onclick="toggleCurtir('+pid+')" style="color:'+(curtido?'var(--red)':'var(--muted)')+'"><span class="pi">'+(curtido?'❤️':'🤍')+'</span>'+(post.likes||0)+'</button>'+
       '<button class="pa" onclick="openComments('+pid+')" style="color:var(--muted)"><span class="pi">💬</span>'+(post.coments||0)+'</button>'+
       '<button class="pa"><span class="pi">↗️</span>Compartilhar</button>'+
       '<div style="flex:1"></div>'+
@@ -2244,31 +2291,32 @@ function sendComment(postId) {
     user: S.perfNome||'Usuário',
     txt: txt,
     hora: 'agora',
-    uid: S.fbUser?S.fbUser.uid:'',
-    timestamp: null
+    uid: S.fbUser?S.fbUser.uid:''
   };
 
-  // Adiciona no cache local imediatamente
-  if(!_comentariosCache[postId]) _comentariosCache[postId] = [];
+  // Adiciona no cache local imediatamente para resposta rápida
+  if(!_comentariosCache[postId]) _comentariosCache[postId]=[];
   _comentariosCache[postId].push(novoComent);
-
-  // Atualiza contador no feed local
-  for(var i=0;i<D.feed.length;i++){
-    if(D.feed[i].id===postId){ D.feed[i].coments=(D.feed[i].coments||0)+1; break; }
-  }
-
   openComments(postId);
-  render();
 
-  // Salva no Firestore
+  // Salva no Firestore usando batch — garante que comentário e contador
+  // são atualizados juntos atomicamente, sem atraso entre os dois
   if(_fbDb){
+    var batch = _fbDb.batch();
+    var comentRef = _fbDb.collection('posts').doc(postId).collection('comentarios').doc();
+    var postRef = _fbDb.collection('posts').doc(postId);
     var data = Object.assign({}, novoComent);
     data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
-    _fbDb.collection('posts').doc(postId).collection('comentarios').add(data);
-    // Incrementa contador no post
-    _fbDb.collection('posts').doc(postId).update({
-      coments: firebase.firestore.FieldValue.increment(1)
-    }).catch(function(){});
+    batch.set(comentRef, data);
+    batch.update(postRef, {coments: firebase.firestore.FieldValue.increment(1)});
+    batch.commit().catch(function(err){
+      toast('Erro ao comentar: ' + err.message);
+      // Remove do cache se falhou
+      if(_comentariosCache[postId]){
+        _comentariosCache[postId].pop();
+      }
+    });
+    // O onSnapshot do feed vai atualizar o contador automaticamente
   }
 }
 
