@@ -720,6 +720,8 @@ function salvarPerfil(){
   }catch(e){}
   // Atualiza topbar imediatamente
   refreshBadges();
+  // Salva perfil no Firestore para persistir entre sessões
+  _salvarPerfilFirestore();
   closeModal();
   toast('Perfil atualizado! ✓');
   render();
@@ -754,8 +756,9 @@ function _initFirebase(){
       S.perfNome=user.displayName||user.email.split('@')[0];
       S.perfEmail=user.email;
       render();
-      // Inicia escuta do feed em tempo real
       _iniciarFeedRealtime();
+      // Carrega perfil salvo no Firestore (foto, posição, nível, cidade)
+      _carregarPerfilFirestore(user.uid);
     } else {
       // Para escuta quando deslogar
       if(_feedUnsub){_feedUnsub();_feedUnsub=null;}
@@ -813,6 +816,58 @@ function _iniciarFeedRealtime(){
           D.feed=posts;render();
         });
     });
+}
+
+/* ── CACHE DE USUÁRIOS ───────────────────────────── */
+var _usuariosCache={};
+
+function _carregarUsuarioCache(uid){
+  if(!_fbDb||!uid||_usuariosCache[uid])return;
+  _usuariosCache[uid]={}; // marca como carregando
+  _fbDb.collection('usuarios').doc(uid).get()
+    .then(function(doc){
+      if(doc.exists){
+        _usuariosCache[uid]=doc.data();
+        render(); // re-renderiza com a foto do autor
+      }
+    }).catch(function(){});
+}
+
+/* ── PERFIL NO FIRESTORE ─────────────────────────── */
+function _carregarPerfilFirestore(uid){
+  if(!_fbDb||!uid)return;
+  _fbDb.collection('usuarios').doc(uid).get()
+    .then(function(doc){
+      if(doc.exists){
+        var d=doc.data();
+        if(d.fotoUrl) S.perfFotoUrl=d.fotoUrl;
+        if(d.nome) S.perfNome=d.nome;
+        if(d.pos) S.perfPos=d.pos;
+        if(d.nivel) S.perfNivel=d.nivel;
+        if(d.cidade) S.perfCidade=d.cidade;
+        if(d.av) S.perfAv=d.av;
+        refreshBadges();
+        render();
+      }
+    }).catch(function(){});
+}
+
+function _salvarPerfilFirestore(){
+  if(!_fbDb||!S.fbUser)return;
+  var data={
+    nome: S.perfNome||'',
+    pos: S.perfPos||'MEI',
+    nivel: S.perfNivel||'Iniciante',
+    cidade: S.perfCidade||'',
+    av: S.perfAv||'🧑',
+    email: S.perfEmail||'',
+    uid: S.fbUser.uid,
+    atualizado: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  // Salva foto só se existir (base64)
+  if(S.perfFotoUrl) data.fotoUrl=S.perfFotoUrl;
+  _fbDb.collection('usuarios').doc(S.fbUser.uid).set(data,{merge:true})
+    .catch(function(err){ console.warn('Erro ao salvar perfil:',err); });
 }
 
 function _tempoRelativo(ts){
@@ -1252,10 +1307,19 @@ function screenSocial(){
     o+='<div class="post">';
     // Avatar: foto real ou emoji
     var postAvHtml;
-    if(post.avatarTipo==='foto'&&post.av&&post.av.startsWith('data:')){
+    // Tenta pegar foto do cache de usuários primeiro
+    var autorFoto = _usuariosCache[post.uid]||null;
+    if(autorFoto && autorFoto.fotoUrl){
+      postAvHtml='<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid '+cor+'"><img src="'+autorFoto.fotoUrl+'" style="width:100%;height:100%;object-fit:cover"></div>';
+    } else if(post.avatarTipo==='foto'&&post.av&&post.av.length>100){
+      // av é base64 diretamente no post
       postAvHtml='<div style="width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid '+cor+'"><img src="'+post.av+'" style="width:100%;height:100%;object-fit:cover"></div>';
+      // Carrega do Firestore em background para o próximo render
+      if(post.uid && !_usuariosCache[post.uid]) _carregarUsuarioCache(post.uid);
     } else {
-      postAvHtml=av(post.av,40,cor);
+      postAvHtml=av(post.av||'🧑',40,cor);
+      // Carrega foto do autor em background
+      if(post.uid && !_usuariosCache[post.uid]) _carregarUsuarioCache(post.uid);
     }
     // Marca post do usuário atual
     var isMeu=S.fbUser&&post.uid===S.fbUser.uid;
