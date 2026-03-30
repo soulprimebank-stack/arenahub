@@ -466,16 +466,19 @@ function bindEvents(){
 function closeModal(){var m=document.getElementById('modal');m.style.display='none';m.innerHTML='';}
 function showModal(c){var m=document.getElementById('modal');m.style.display='flex';m.innerHTML='<div class="msh su" onclick="event.stopPropagation()"><div class="mhd"></div>'+c+'</div>';}
 function openNotif(){
-  var nl2=D.notifs.filter(function(n){return!n.lida;}).length;
-  var icons={vaga:'⚽',reserva:'📅',av:'⭐',jogo:'🎮',ranking:'🏆',curtida:'❤️'};
-  var rows=D.notifs.map(function(n){
+  marcarNotifsLidas();
+  D.notifs.forEach(function(n){n.lida=true;});
+  refreshBadges();
+  var icons={vaga:'⚽',reserva:'📅',av:'⭐',jogo:'🎮',ranking:'🏆',curtida:'❤️',comentario:'💬',follow:'👤',like:'❤️'};
+  var rows=D.notifs.length>0?D.notifs.map(function(n){
     return '<div style="display:flex;gap:11px;padding:11px 13px;background:'+(n.lida?'transparent':'var(--card)')+';border-radius:13px;border:1px solid '+(n.lida?'transparent':'var(--bord)')+';margin-bottom:7px">'+
       '<div style="width:36px;height:36px;border-radius:9px;background:'+(n.lida?'var(--surf)':'rgba(0,240,130,.12)')+';display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">'+(icons[n.tipo]||'🔔')+'</div>'+
       '<div style="flex:1"><div style="font-size:13px;line-height:1.4">'+esc(n.txt)+'</div>'+
-      '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+n.hora+'</div></div>'+
+      '<div style="color:var(--muted);font-size:11px;margin-top:2px">'+(n.hora||'agora')+'</div></div>'+
       (n.lida?'':'<div style="width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;margin-top:5px"></div>')+
       '</div>';
-  }).join('');
+  }).join(''):'<div class="empty" style="padding:30px 0;text-align:center">Nenhuma notificação ainda 🔔</div>';
+  var nl2=D.notifs.filter(function(n){return !n.lida;}).length;
   showModal('<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><span style="font-weight:900;font-size:17px">🔔 Notificações</span>'+(nl2>0?pl(nl2+' novas','#FF4060'):'')+
     '</div>'+rows+'<button class="btn bs bfw" style="margin-top:8px" onclick="closeModal()">Fechar</button>');
 }
@@ -757,8 +760,10 @@ function _initFirebase(){
       S.perfEmail=user.email;
       render();
       _iniciarFeedRealtime();
-      // Carrega perfil salvo no Firestore (foto, posição, nível, cidade)
       _carregarPerfilFirestore(user.uid);
+      _carregarSeguindo();
+      _carregarJogadoresFirestore();
+      _iniciarNotificacoesRealtime();
     } else {
       // Para escuta quando deslogar
       if(_feedUnsub){_feedUnsub();_feedUnsub=null;}
@@ -1058,7 +1063,13 @@ function toggleCurtir(id){
     likes:firebase.firestore.FieldValue.increment(delta)
   }).then(function(){
     S._curtindoId=null;
-    // O onSnapshot vai atualizar o valor real automaticamente
+    // Notifica o dono do post se for curtida (não descurtida)
+    if(!jaLikei){
+      var post=D.feed.filter(function(p){return p.id===sid;})[0];
+      if(post&&post.uid&&post.uid!==S.fbUser.uid){
+        _enviarNotificacao(post.uid,'like',S.perfNome+' curtiu sua publicação ❤️',S.fbUser.uid,'like');
+      }
+    }
   }).catch(function(err){
     // Reverte se der erro
     S.curtidos[sid]=jaLikei;
@@ -1107,7 +1118,73 @@ function setCFoto(i){S.cFotoIdx=i;render();}
 function setCAbaDet(a){S.cAbaDet=a;render();}
 function toggleSeguirCampo(id){S.cSeguindo[id]=!S.cSeguindo[id];render();toast(S.cSeguindo[id]?'Seguindo campo! 🏟️':'Deixou de seguir');}
 function toggleMembro(id){S.cMembro[id]=!S.cMembro[id];render();toast(S.cMembro[id]?'Você agora é mensalista! 🎉':'Assinatura cancelada');}
-function toggleSeguirJog(id){S.seguindo[id]=!S.seguindo[id];render();toast(S.seguindo[id]?'Seguindo jogador! 👤':'Deixou de seguir');}
+function toggleSeguirJog(uid){
+  if(!S.fbUser||!_fbDb){toast('Faça login para seguir');return;}
+  if(uid===S.fbUser.uid){toast('Você não pode se seguir 😄');return;}
+  var jaSegue=!!S.seguindo[uid];
+  S.seguindo[uid]=!jaSegue;
+  render();
+
+  var meuUid=S.fbUser.uid;
+  var batch=_fbDb.batch();
+
+  if(!jaSegue){
+    // Seguir: cria documento em /seguindo/{meuUid}/lista/{uidAlvo}
+    var segRef=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
+    batch.set(segRef,{uid:uid,desde:firebase.firestore.FieldValue.serverTimestamp()});
+    toast('Seguindo! 👤');
+    // Dispara notificação para o alvo
+    _enviarNotificacao(uid,'seguiu',S.perfNome+' começou a te seguir 👤',S.fbUser.uid,'follow');
+  } else {
+    // Deixar de seguir: remove documento
+    var segRef2=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
+    batch.delete(segRef2);
+    toast('Deixou de seguir');
+  }
+  batch.commit().catch(function(err){
+    // Reverte em caso de erro
+    S.seguindo[uid]=jaSegue;
+    render();
+    console.warn('Erro ao seguir:',err);
+  });
+}
+
+function _carregarSeguindo(){
+  if(!_fbDb||!S.fbUser)return;
+  _fbDb.collection('seguindo').doc(S.fbUser.uid).collection('lista')
+    .get().then(function(snap){
+      snap.forEach(function(doc){ S.seguindo[doc.id]=true; });
+      render();
+    }).catch(function(){});
+}
+
+function _carregarJogadoresFirestore(){
+  if(!_fbDb)return;
+  _fbDb.collection('usuarios').orderBy('nome').limit(100)
+    .get().then(function(snap){
+      var lista=[];
+      snap.forEach(function(doc){
+        var d=doc.data();
+        if(d.nome&&d.uid&&d.uid!==( S.fbUser?S.fbUser.uid:'')){
+          lista.push({
+            id:d.uid,
+            uid:d.uid,
+            nome:d.nome,
+            pos:d.pos||'MEI',
+            nivel:d.nivel||'Iniciante',
+            cidade:d.cidade||'',
+            av:d.av||'🧑',
+            fotoUrl:d.fotoUrl||null,
+            gols:d.gols||0,
+            assist:d.assist||0,
+            seg:d.seg||0
+          });
+        }
+      });
+      D.jogadores=lista;
+      render();
+    }).catch(function(){});
+}
 function setCAbH(a){S.cAbaH=a;render();}
 function selectHor(id){for(var i=0;i<D.horarios.length;i++){if(D.horarios[i].id===id){S.horSel=D.horarios[i];break;}}render();}
 function setPagMet(m){S.pagMet=m;render();}
@@ -2144,26 +2221,53 @@ function toggleDark() {
 })();
 
 /* ── AUTO NOTIF (simulated push) ───────────────── */
-var notifMessages = [
-  
-  'Seu jogo começa em 1 hora! ⚽',
-  
-  
-  'Copa do Cerrado: inscrições encerram amanhã! 🏆'
-];
-var notifIdx = 0;
-function startNotifTimer() {
-  if (!S.configs || !S.configs.notif) return;
-  setTimeout(function() {
-    if (!S.logado) return;
-    var msg = notifMessages[notifIdx % notifMessages.length];
-    notifIdx++;
-    D.notifs.unshift({id: Date.now(), txt: msg, hora: 'Agora', tipo: 'jogo', lida: false});
-    refreshBadges();
-    toast('🔔 ' + msg.substring(0, 40) + (msg.length > 40 ? '...' : ''));
-    startNotifTimer();
-  }, 45000 + Math.random() * 30000);
+/* ── NOTIFICAÇÕES FIRESTORE ──────────────────────── */
+var _notifUnsub=null;
+
+function _iniciarNotificacoesRealtime(){
+  if(!_fbDb||!S.fbUser)return;
+  if(_notifUnsub){_notifUnsub();}
+  _notifUnsub=_fbDb.collection('notificacoes').doc(S.fbUser.uid)
+    .collection('lista')
+    .orderBy('timestamp','desc')
+    .limit(30)
+    .onSnapshot(function(snap){
+      var notifs=[];
+      snap.forEach(function(doc){
+        var d=doc.data();
+        d.id=doc.id;
+        d.hora=_tempoRelativo(d.timestamp);
+        notifs.push(d);
+      });
+      D.notifs=notifs;
+      refreshBadges();
+    },function(){});
 }
+
+function _enviarNotificacao(uidDestino,tipo,txt,uidOrigem,tipoIcon){
+  if(!_fbDb||!uidDestino||uidDestino===uidOrigem)return;
+  _fbDb.collection('notificacoes').doc(uidDestino)
+    .collection('lista').add({
+      tipo:tipoIcon||tipo,
+      txt:txt,
+      uidOrigem:uidOrigem||'',
+      lida:false,
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(function(){});
+}
+
+function marcarNotifsLidas(){
+  if(!_fbDb||!S.fbUser)return;
+  var naoLidas=D.notifs.filter(function(n){return !n.lida;});
+  var batch=_fbDb.batch();
+  naoLidas.forEach(function(n){
+    var ref=_fbDb.collection('notificacoes').doc(S.fbUser.uid).collection('lista').doc(n.id);
+    batch.update(ref,{lida:true});
+  });
+  if(naoLidas.length>0) batch.commit().catch(function(){});
+}
+
+function startNotifTimer(){} // mantido para compatibilidade — notificações agora são do Firestore
 
 /* ── ONBOARDING ─────────────────────────────────── */
 function checkOnboarding() {
@@ -2395,7 +2499,13 @@ function sendComment(postId) {
     data.timestamp = firebase.firestore.FieldValue.serverTimestamp();
     batch.set(comentRef, data);
     batch.update(postRef, {coments: firebase.firestore.FieldValue.increment(1)});
-    batch.commit().catch(function(err){
+    batch.commit().then(function(){
+      // Notifica o dono do post
+      var post=D.feed.filter(function(p){return p.id===postId;})[0];
+      if(post&&post.uid&&post.uid!==S.fbUser.uid){
+        _enviarNotificacao(post.uid,'comentario',S.perfNome+' comentou na sua publicação 💬',S.fbUser.uid,'comentario');
+      }
+    }).catch(function(err){
       toast('Erro ao comentar: ' + err.message);
       // Remove do cache se falhou
       if(_comentariosCache[postId]){
