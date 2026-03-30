@@ -916,6 +916,28 @@ function _salvarPostFirestore(post, callback){
 /* ── LOGIN ACTIONS ────────────────────────────────── */
 function setLoginAba(a){S.loginAba=a;S.loginErro='';render();}
 
+function doRecuperarSenha(){
+  var em=document.getElementById('login-email');
+  var email=em?em.value.trim():'';
+  if(!email){
+    // Pede o email via prompt se campo vazio
+    email=prompt('Digite seu email para recuperar a senha:');
+    if(!email)return;
+    email=email.trim();
+  }
+  var auth=_initFirebase();
+  auth.sendPasswordResetEmail(email)
+    .then(function(){
+      toast('Link de recuperação enviado para '+email+' 📧');
+    })
+    .catch(function(err){
+      var msgs={
+        'auth/user-not-found':'Email não encontrado.',
+        'auth/invalid-email':'Email inválido.'
+      };
+      toast(msgs[err.code]||'Erro ao enviar email.');
+    });
+}
 function doLogin(){
   var em=document.getElementById('login-email');
   var sn=document.getElementById('login-senha');
@@ -1132,7 +1154,7 @@ function screenLogin(){
     o+='<div class="fg"><label class="fl">Email</label><input class="fi" id="login-email" type="email" placeholder="seu@email.com" autocomplete="email"></div>';
     o+='<div class="fg" style="margin-bottom:18px"><label class="fl">Senha</label><input class="fi" id="login-senha" type="password" placeholder="••••••••" autocomplete="current-password"></div>';
     o+='<button class="btn bp bfw blg" onclick="doLogin()">Entrar</button>';
-    o+='<div style="text-align:center;margin-top:11px"><button style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer" onclick="toast(\'Link enviado! 📧\')">Esqueci minha senha</button></div>';
+    o+='<div style="text-align:center;margin-top:11px"><button style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer" onclick="doRecuperarSenha()">Esqueci minha senha</button></div>';
   }else{
     o+='<div class="fg"><label class="fl">Nome completo</label><input class="fi" id="cad-nome" type="text" placeholder="Seu nome..." autocomplete="name"></div>';
     o+='<div class="fg"><label class="fl">Email</label><input class="fi" id="cad-email" type="email" placeholder="seu@email.com" autocomplete="email"></div>';
