@@ -1165,7 +1165,7 @@ function _carregarJogadoresFirestore(){
       var lista=[];
       snap.forEach(function(doc){
         var d=doc.data();
-        if(d.nome&&d.uid&&d.uid!==( S.fbUser?S.fbUser.uid:'')){
+        if(d.nome&&d.uid){
           lista.push({
             id:d.uid,
             uid:d.uid,
