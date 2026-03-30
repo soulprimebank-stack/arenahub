@@ -1559,28 +1559,39 @@ function screenCriarPerfil(){
 function screenJogadorDetalhe(j){
   var isJuiz = j.pos === 'JUI';
   if (isJuiz) return screenJuizDetalhe(j);
-  var ef=Math.round((j.gols+j.assist)/j.jogos*100);
+  // Valores padrão para campos que podem não existir no Firestore
+  var jogos = j.jogos||0;
+  var gols = j.gols||0;
+  var assist = j.assist||0;
+  var nota = j.nota||0;
+  var pe = j.pe||'—';
+  var altura = j.altura||'—';
+  var ef = jogos>0 ? Math.round((gols+assist)/jogos*100) : 0;
   var o='<div class="fu" style="padding:14px 14px">'+bb('backJ()');
   o+='<div style="border-radius:20px;background:linear-gradient(135deg,#111520,#0C0F1A);border:1px solid var(--bord);padding:22px;text-align:center;margin-bottom:14px">';
-  o+='<div style="position:relative;display:inline-block">'+av(j.av,76,'#4D9EFF');
+  // Avatar — usa foto real se disponível
+  var avHtml = (j.fotoUrl)
+    ? '<div style="width:76px;height:76px;border-radius:50%;overflow:hidden;display:inline-block;border:3px solid #4D9EFF"><img src="'+j.fotoUrl+'" style="width:100%;height:100%;object-fit:cover"></div>'
+    : av(j.av,76,'#4D9EFF');
+  o+='<div style="position:relative;display:inline-block">'+avHtml;
   o+='<div style="position:absolute;bottom:0;right:0;background:linear-gradient(135deg,var(--green),var(--teal));border-radius:99px;padding:2px 7px;font-size:10px;font-weight:900;color:var(--bg);border:2px solid var(--bg)">'+j.pos+'</div></div>';
-  o+='<div style="font-weight:900;font-size:21px;margin:11px 0 3px">'+esc(j.nome)+'</div>'+stars(j.nota,13);
+  o+='<div style="font-weight:900;font-size:21px;margin:11px 0 3px">'+esc(j.nome)+'</div>'+stars(nota,13);
   o+='<div style="display:flex;justify-content:center;gap:7px;margin-top:11px;flex-wrap:wrap">'+pl(j.nivel,'#FFBE00')+pl(j.cidade,'#4D9EFF')+(j.time?pl(j.time,'#FF7043'):'')+'</div>';
   o+='<div style="display:flex;justify-content:center;gap:20px;margin-top:13px">';
-  o+='<div style="text-align:center"><div style="color:var(--green);font-weight:900;font-size:16px">'+j.seg+'</div><div style="color:var(--muted);font-size:11px">seguidores</div></div>';
+  o+='<div style="text-align:center"><div style="color:var(--green);font-weight:900;font-size:16px">'+(j.seg||0)+'</div><div style="color:var(--muted);font-size:11px">seguidores</div></div>';
   o+='<div style="width:1px;background:var(--bord)"></div>';
-  o+='<div style="text-align:center"><div style="color:var(--gold);font-weight:900;font-size:16px">'+j.gols+'</div><div style="color:var(--muted);font-size:11px">gols</div></div>';
+  o+='<div style="text-align:center"><div style="color:var(--gold);font-weight:900;font-size:16px">'+gols+'</div><div style="color:var(--muted);font-size:11px">gols</div></div>';
   o+='<div style="width:1px;background:var(--bord)"></div>';
-  o+='<div style="text-align:center"><div style="color:var(--blue);font-weight:900;font-size:16px">'+j.jogos+'</div><div style="color:var(--muted);font-size:11px">jogos</div></div>';
+  o+='<div style="text-align:center"><div style="color:var(--blue);font-weight:900;font-size:16px">'+jogos+'</div><div style="color:var(--muted);font-size:11px">jogos</div></div>';
   o+='</div></div>';
   o+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:13px">';
-  [{l:'Gols',v:j.gols,ic:'⚽',c:'#FFBE00'},{l:'Assist.',v:j.assist,ic:'🎯',c:'#4D9EFF'},{l:'Jogos',v:j.jogos,ic:'📅',c:'var(--text2)'},{l:'Efic.',v:ef+'%',ic:'📊',c:'#00F082'}].forEach(function(s){
+  [{l:'Gols',v:gols,ic:'⚽',c:'#FFBE00'},{l:'Assist.',v:assist,ic:'🎯',c:'#4D9EFF'},{l:'Jogos',v:jogos,ic:'📅',c:'var(--text2)'},{l:'Efic.',v:ef+'%',ic:'📊',c:'#00F082'}].forEach(function(s){
     o+='<div class="scard"><div style="font-size:17px;margin-bottom:3px">'+s.ic+'</div><div style="color:'+s.c+';font-weight:900;font-size:17px">'+s.v+'</div><div class="slbl">'+s.l+'</div></div>';
   });
   o+='</div>';
   o+='<div class="card" style="margin-bottom:13px;padding:13px 14px">';
-  [{l:'Posição',v:j.pos},{l:'Nível',v:j.nivel},{l:'Pé',v:j.pe},{l:'Altura',v:j.altura},{l:'Cidade',v:j.cidade}].forEach(function(inf){
-    o+='<div style="display:flex;justify-content:space-between;margin-bottom:7px"><span style="color:var(--muted);font-size:13px">'+inf.l+'</span><span style="font-size:13px;font-weight:600">'+esc(inf.v)+'</span></div>';
+  [{l:'Posição',v:j.pos},{l:'Nível',v:j.nivel},{l:'Pé',v:pe},{l:'Altura',v:altura},{l:'Cidade',v:j.cidade||'—'}].forEach(function(inf){
+    o+='<div style="display:flex;justify-content:space-between;margin-bottom:7px"><span style="color:var(--muted);font-size:13px">'+inf.l+'</span><span style="font-size:13px;font-weight:600">'+esc(String(inf.v||'—'))+'</span></div>';
   });
   o+='</div>';
   // Conquistas de jogador
