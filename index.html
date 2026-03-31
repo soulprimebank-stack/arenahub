@@ -2480,44 +2480,116 @@ function showOnboarding(step) {
 
 /* ── SCREEN: RANKING ────────────────────────────── */
 function screenRanking() {
-  var sorted = D.jogadores.slice().sort(function(a, b) { return (b.gols * 2 + b.assist) - (a.gols * 2 + a.assist); });
+  // Abas do ranking
+  if(!S.rankAba) S.rankAba = 'geral';
+
+  var abas = [
+    {id:'geral',  l:'🏆 Geral'},
+    {id:'gols',   l:'⚽ Artilheiros'},
+    {id:'assist', l:'🎯 Garçons'},
+    {id:'seguidos',l:'👥 Seguidos'}
+  ];
+
   var o = '<div class="fu" style="padding:0 14px">';
-  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 16px"><span class="stl">🏆 Ranking Geral</span>' + bb('go(\'jogadores\')') + '</div>';
-  // Podium top 3
-  var top3 = [{j:sorted[1],rank:2,h:68,cor:'#A8B5CC'},{j:sorted[0],rank:1,h:90,cor:'#FFBE00'},{j:sorted[2],rank:3,h:52,cor:'#FF7043'}];
-  o += '<div class="podium">';
-  top3.forEach(function(p) {
-    var pts = p.j.gols * 2 + p.j.assist;
-    o += '<div class="pod-slot">';
-    o += '<div style="width:' + (p.rank===1?62:50) + 'px;height:' + (p.rank===1?62:50) + 'px;border-radius:50%;background:var(--surf);border:3px solid ' + p.cor + ';display:flex;align-items:center;justify-content:center;font-size:' + (p.rank===1?28:22) + 'px">' + p.j.av + '</div>';
-    o += '<div class="pod-nm" style="color:' + (p.rank===1?'var(--text)':'var(--text2)') + '">' + p.j.nome.split(' ')[0] + '</div>';
-    o += '<div class="pod-pt" style="color:' + p.cor + '">' + pts + ' pts</div>';
-    o += '<div class="pod-bar" style="height:' + p.h + 'px;background:linear-gradient(180deg,' + p.cor + '40,' + p.cor + '18);border:1px solid ' + p.cor + '44;border-bottom:none">' + ['🥇','🥈','🥉'][p.rank-1] + '</div>';
+  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px">';
+  o += '<span class="stl">🏆 Ranking</span>';
+  o += '</div>';
+
+  // Abas
+  o += '<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none">';
+  abas.forEach(function(a){
+    var sel = S.rankAba === a.id;
+    o += '<button onclick="S.rankAba=\''+a.id+'\';render()" style="flex-shrink:0;padding:7px 13px;border-radius:99px;border:1.5px solid '+(sel?'var(--green)':'var(--bord)')+';background:'+(sel?'var(--green)':'transparent')+';color:'+(sel?'var(--bg)':'var(--text2)')+';font-size:12px;font-weight:700;cursor:pointer">'+a.l+'</button>';
+  });
+  o += '</div>';
+
+  // Dados dos jogadores do Firestore
+  var lista = D.jogadores.slice();
+
+  if(lista.length === 0){
+    o += '<div style="text-align:center;padding:60px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">🏆</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Ranking vazio</div>';
+    o += '<div style="color:var(--muted);font-size:13px">Cadastre seu perfil de jogador para aparecer aqui!</div>';
+    o += '</div>';
+    o += '</div>';
+    return o;
+  }
+
+  // Ordena conforme a aba
+  if(S.rankAba === 'gols'){
+    lista.sort(function(a,b){ return (b.gols||0)-(a.gols||0); });
+  } else if(S.rankAba === 'assist'){
+    lista.sort(function(a,b){ return (b.assist||0)-(a.assist||0); });
+  } else if(S.rankAba === 'seguidos'){
+    lista.sort(function(a,b){ return (b.seg||0)-(a.seg||0); });
+  } else {
+    // Geral: gols*2 + assist + seguidos
+    lista.sort(function(a,b){
+      return ((b.gols||0)*2+(b.assist||0)+(b.seg||0)) - ((a.gols||0)*2+(a.assist||0)+(a.seg||0));
+    });
+  }
+
+  // Pódio top 3
+  if(lista.length >= 3){
+    var top3 = [
+      {j:lista[1], rank:2, h:68, cor:'#A8B5CC', medal:'🥈'},
+      {j:lista[0], rank:1, h:90, cor:'#FFBE00', medal:'🥇'},
+      {j:lista[2], rank:3, h:52, cor:'#FF7043', medal:'🥉'}
+    ];
+    o += '<div style="display:flex;align-items:flex-end;justify-content:center;gap:8px;margin-bottom:20px">';
+    top3.forEach(function(p){
+      if(!p.j) return;
+      var pts = S.rankAba==='gols'?(p.j.gols||0)
+              : S.rankAba==='assist'?(p.j.assist||0)
+              : S.rankAba==='seguidos'?(p.j.seg||0)
+              : ((p.j.gols||0)*2+(p.j.assist||0)+(p.j.seg||0));
+      var avHtml = p.j.fotoUrl
+        ? '<img src="'+p.j.fotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+        : '<span style="font-size:'+(p.rank===1?'28px':'22px')+'">'+( p.j.av||'🧑')+'</span>';
+      o += '<div style="display:flex;flex-direction:column;align-items:center;flex:1">';
+      o += '<div style="font-size:20px;margin-bottom:4px">'+p.medal+'</div>';
+      o += '<div style="width:'+(p.rank===1?'60px':'48px')+';height:'+(p.rank===1?'60px':'48px')+';border-radius:50%;border:3px solid '+p.cor+';overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--surf)">'+avHtml+'</div>';
+      o += '<div style="font-weight:700;font-size:11px;margin-top:5px;text-align:center;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.j.nome.split(' ')[0])+'</div>';
+      o += '<div style="color:'+p.cor+';font-weight:900;font-size:13px">'+pts+' pts</div>';
+      o += '<div style="width:100%;height:'+p.h+'px;background:linear-gradient(180deg,'+p.cor+'40,'+p.cor+'18);border:1px solid '+p.cor+'44;border-bottom:none;border-radius:8px 8px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:6px;font-size:20px">'+['🥇','🥈','🥉'][p.rank-1]+'</div>';
+      o += '</div>';
+    });
+    o += '</div>';
+  }
+
+  // Lista completa
+  o += '<div class="card" style="padding:6px 0">';
+  lista.forEach(function(j, i){
+    var pts = S.rankAba==='gols'?(j.gols||0)
+            : S.rankAba==='assist'?(j.assist||0)
+            : S.rankAba==='seguidos'?(j.seg||0)
+            : ((j.gols||0)*2+(j.assist||0)+(j.seg||0));
+    var unid = S.rankAba==='gols'?'gols'
+             : S.rankAba==='assist'?'assist'
+             : S.rankAba==='seguidos'?'seguidores'
+             :'pts';
+    var cor = i===0?'#FFBE00':i===1?'#A8B5CC':i===2?'#FF7043':'var(--muted)';
+    var medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'º';
+    var isMeu = S.fbUser && j.uid === S.fbUser.uid;
+    var avHtml = j.fotoUrl
+      ? '<div style="width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid '+(isMeu?'var(--green)':'var(--bord)')+'"><img src="'+j.fotoUrl+'" style="width:100%;height:100%;object-fit:cover"></div>'
+      : '<div style="width:38px;height:38px;border-radius:50%;background:var(--surf);border:2px solid '+(isMeu?'var(--green)':'var(--bord)')+';display:flex;align-items:center;justify-content:center;font-size:18px">'+( j.av||'🧑')+'</div>';
+
+    o += '<div onclick="openJogador(\'' + j.uid + '\')" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;background:'+(isMeu?'rgba(0,240,130,.05)':'transparent')+';border-bottom:1px solid var(--bord)">';
+    o += '<span style="font-size:14px;width:26px;text-align:center;color:'+cor+';font-weight:800">'+medal+'</span>';
+    o += avHtml;
+    o += '<div style="flex:1;min-width:0">';
+    o += '<div style="font-weight:700;font-size:13px;display:flex;align-items:center;gap:5px">'+esc(j.nome)+(isMeu?'<span style="font-size:9px;background:var(--green);color:var(--bg);border-radius:99px;padding:1px 6px">você</span>':'')+'</div>';
+    o += '<div style="color:var(--muted);font-size:11px;margin-top:1px">'+( j.pos||'MEI')+' · '+(j.nivel||'Iniciante')+'</div>';
+    o += '</div>';
+    o += '<div style="text-align:right;flex-shrink:0">';
+    o += '<div style="color:'+cor+';font-weight:900;font-size:16px">'+pts+'</div>';
+    o += '<div style="color:var(--muted);font-size:10px">'+unid+'</div>';
+    o += '</div>';
     o += '</div>';
   });
   o += '</div>';
-  // Categories
-  var cats = [
-    {titulo:'⚽ Artilheiros', campo:'gols', unidade:'gols', cor:'#FFBE00'},
-    {titulo:'🎯 Garçons', campo:'assist', unidade:'assist.', cor:'#4D9EFF'},
-    {titulo:'📅 Mais jogos', campo:'jogos', unidade:'jogos', cor:'#00F082'},
-  ];
-  cats.forEach(function(cat) {
-    var rank = D.jogadores.slice().sort(function(a,b){return b[cat.campo]-a[cat.campo];}).slice(0,5);
-    var max = rank[0][cat.campo];
-    o += '<div class="shd"><span class="stl">' + cat.titulo + '</span></div>';
-    o += '<div class="card" style="margin-bottom:16px;padding:13px 14px">';
-    rank.forEach(function(j, i) {
-      var pct = Math.round(j[cat.campo] / max * 100);
-      o += '<div style="display:flex;align-items:center;gap:9px;margin-bottom:' + (i < 4 ? '11px' : '0') + '">';
-      o += '<span style="font-size:14px;width:20px;text-align:center;color:' + (i<3?'var(--gold)':'var(--muted)') + '">' + (i<3?['🥇','🥈','🥉'][i]:(i+1)+'º') + '</span>';
-      o += av(j.av, 32);
-      o += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">' + esc(j.nome) + '</div>';
-      o += '<div style="margin-top:4px;background:var(--surf);border-radius:99px;height:5px"><div style="width:' + pct + '%;height:5px;border-radius:99px;background:' + cat.cor + '"></div></div></div>';
-      o += '<span style="color:' + cat.cor + ';font-weight:900;font-size:14px;flex-shrink:0">' + j[cat.campo] + '<span style="color:var(--muted);font-size:10px"> ' + cat.unidade + '</span></span></div>';
-    });
-    o += '</div>';
-  });
   o += '</div>';
   return o;
 }
