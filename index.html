@@ -328,7 +328,7 @@ var S={
   pTipo:"post",pTxt:"",
   comentando:null,vplay:null,
   tornAba:"abertos",tornSel:null,tornCriar:false,
-  msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,
+  msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,stMidiaBlob:null,stMidiaFile:null,
   perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑"
 };
 
@@ -891,20 +891,42 @@ function _iniciarStoriesRealtime(){
 }
 
 function publicarStory(){
-  if(!S.stMidiaUrl){toast('Adicione uma foto ou vídeo ao story! 📸');return;}
-  if(!_fbDb||!S.fbUser){toast('Faça login para publicar');return;}
+  var temFoto = !!S.stMidiaUrl;
+  var temVideo = !!(S.stMidiaFile || S.stMidiaBlob);
+  if(!temFoto && !temVideo){ toast('Adicione uma foto ou vídeo ao story! 📸'); return; }
+  if(!_fbDb||!S.fbUser){ toast('Faça login para publicar'); return; }
+
+  if(S.stMidiaTipo === 'video' && S.stMidiaFile){
+    // Vídeo: converter para base64, mas limitar a 900KB
+    var maxVideoSize = 900 * 1024; // 900KB
+    if(S.stMidiaFile.size > maxVideoSize){
+      toast('Vídeo muito grande! Máx 900KB. Grave um vídeo mais curto. 🎬');
+      return;
+    }
+    var vrdr = new FileReader();
+    vrdr.onload = function(e){
+      _salvarStoryFirestore(e.target.result, 'video');
+    };
+    vrdr.onerror = function(){ toast('Erro ao ler vídeo'); };
+    vrdr.readAsDataURL(S.stMidiaFile);
+  } else if(temFoto){
+    _salvarStoryFirestore(S.stMidiaUrl, 'foto');
+  }
+}
+
+function _salvarStoryFirestore(midiaUrl, tipo){
   var agora = firebase.firestore.Timestamp.now();
   var expira = new Date(Date.now() + 24*60*60*1000);
   _fbDb.collection('stories').add({
     uid: S.fbUser.uid,
     nome: S.perfNome,
-    midiaUrl: S.stMidiaUrl,
-    midiaType: S.stMidiaTipo||'foto',
+    fotoUrl: S.perfFotoUrl || null,
+    midiaUrl: midiaUrl,
+    midiaType: tipo || 'foto',
     timestamp: agora,
     expira: firebase.firestore.Timestamp.fromDate(expira)
   }).then(function(){
-    S.stMidiaUrl = null;
-    S.stMidiaTipo = null;
+    _limparStoryMidia();
     closeModal();
     toast('Story publicado! ✓ Expira em 24h ⏱️');
   }).catch(function(err){
@@ -913,14 +935,18 @@ function publicarStory(){
 }
 
 function openStoryModal(){
-  S.stMidiaUrl = null;
-  S.stMidiaTipo = null;
+  // NÃO zerar stMidiaUrl aqui — pode vir de handleStoryMidia
+  var temMidia = !!(S.stMidiaUrl || S.stMidiaBlob);
   var o = '<div style="font-weight:800;font-size:16px;margin:0 0 16px">📱 Novo Story</div>';
-  if(S.stMidiaUrl){
+  if(temMidia){
     if(S.stMidiaTipo==='video'){
-      o += '<video src="'+S.stMidiaUrl+'" style="width:100%;border-radius:14px;max-height:260px;margin-bottom:12px" controls playsinline></video>';
+      var videoSrc = S.stMidiaBlob || S.stMidiaUrl;
+      o += '<div style="position:relative;margin-bottom:12px">';
+      o += '<video src="'+videoSrc+'" style="width:100%;border-radius:14px;max-height:260px;margin-bottom:0;background:#000" controls playsinline></video>';
+      o += '<button onclick="_limparStoryMidia()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;cursor:pointer;font-size:14px">✕</button>';
+      o += '</div>';
     } else {
-      o += '<div style="position:relative;margin-bottom:12px"><img src="'+S.stMidiaUrl+'" style="width:100%;border-radius:14px;max-height:280px;object-fit:cover"><button onclick="S.stMidiaUrl=null;openStoryModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;cursor:pointer">✕</button></div>';
+      o += '<div style="position:relative;margin-bottom:12px"><img src="'+S.stMidiaUrl+'" style="width:100%;border-radius:14px;max-height:280px;object-fit:cover"><button onclick="_limparStoryMidia()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;cursor:pointer;font-size:14px">✕</button></div>';
     }
   } else {
     o += '<div style="background:var(--surf);border:2px dashed var(--bord);border-radius:14px;padding:30px;text-align:center;margin-bottom:14px">';
@@ -934,16 +960,30 @@ function openStoryModal(){
   o += '<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:12px 5px;cursor:pointer"><input type="file" accept="image/*,video/*" style="display:none" onchange="handleStoryMidia(this)"><div style="font-size:24px">🖼️</div><div style="font-size:10px;font-weight:700;text-align:center">Galeria</div></label>';
   o += '</div>';
   o += '<div style="display:flex;gap:9px">';
-  o += '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>';
-  o += '<button class="btn bp" style="flex:1" onclick="publicarStory()" '+(S.stMidiaUrl?'':'disabled style="flex:1;opacity:.5"')+'>Publicar ✓</button>';
+  o += '<button class="btn bs" style="flex:1" onclick="_limparStoryMidia();closeModal()">Cancelar</button>';
+  o += '<button class="btn bp" style="flex:1" onclick="publicarStory()" '+(temMidia?'':'disabled')+' style="flex:1'+(temMidia?'':';opacity:.5')+'">Publicar ✓</button>';
   o += '</div>';
   showModal(o);
 }
 
+function _limparStoryMidia(){
+  if(S.stMidiaBlob){ try{URL.revokeObjectURL(S.stMidiaBlob);}catch(e){} }
+  S.stMidiaUrl = null;
+  S.stMidiaBlob = null;
+  S.stMidiaTipo = null;
+  S.stMidiaFile = null;
+}
+
 function handleStoryMidia(input){
   var file = input.files[0];
-  if(!file)return;
+  if(!file) return;
+  // Limpar mídia anterior
+  if(S.stMidiaBlob){ try{URL.revokeObjectURL(S.stMidiaBlob);}catch(e){} }
+  S.stMidiaUrl = null;
+  S.stMidiaBlob = null;
+  S.stMidiaFile = null;
   S.stMidiaTipo = file.type.startsWith('video') ? 'video' : 'foto';
+
   if(file.type.startsWith('image/')){
     var img = new Image();
     var reader = new FileReader();
@@ -952,20 +992,30 @@ function handleStoryMidia(input){
         var canvas = document.createElement('canvas');
         var maxW = 720, maxH = 1280;
         var w = img.width, h = img.height;
-        if(w/h > maxW/maxH){ h = Math.round(h*maxW/w); w = maxW; }
-        else { w = Math.round(w*maxH/h); h = maxH; }
-        canvas.width=w; canvas.height=h;
-        canvas.getContext('2d').drawImage(img,0,0,w,h);
-        S.stMidiaUrl = canvas.toDataURL('image/jpeg',0.80);
+        if(w > 0 && h > 0){
+          if(w/h > maxW/maxH){ h = Math.round(h*maxW/w); w = maxW; }
+          else { w = Math.round(w*maxH/h); h = maxH; }
+          if(w > maxW){ h = Math.round(h*maxW/w); w = maxW; }
+          if(h > maxH){ w = Math.round(w*maxH/h); h = maxH; }
+        }
+        canvas.width = w || 720; canvas.height = h || 1280;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        S.stMidiaUrl = canvas.toDataURL('image/jpeg', 0.80);
+        S.stMidiaTipo = 'foto';
         openStoryModal();
       };
+      img.onerror = function(){ toast('Erro ao carregar imagem'); };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
+  } else if(file.type.startsWith('video/')){
+    // Vídeo: blob URL para preview (base64 estoura o Firestore)
+    S.stMidiaBlob = URL.createObjectURL(file);
+    S.stMidiaFile = file;
+    S.stMidiaTipo = 'video';
+    openStoryModal();
   } else {
-    var reader2 = new FileReader();
-    reader2.onload = function(e){ S.stMidiaUrl = e.target.result; openStoryModal(); };
-    reader2.readAsDataURL(file);
+    toast('Formato não suportado. Use foto ou vídeo.');
   }
 }
 
