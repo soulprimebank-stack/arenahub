@@ -79,6 +79,15 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
 .stor-ring{padding:2.5px;border-radius:50%;}
 .stor-av{width:56px;height:56px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--bg);}
 .stor-lb{font-size:10px;color:var(--text2);max-width:60px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Story viewer */
+.story-viewer{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;height:100vh;background:#000;z-index:9999;display:flex;flex-direction:column;}
+.story-progress-bar{display:flex;gap:3px;padding:10px 10px 6px;position:absolute;top:0;left:0;right:0;z-index:2;}
+.story-prog-seg{flex:1;height:3px;background:rgba(255,255,255,.35);border-radius:99px;overflow:hidden;}
+.story-prog-fill{height:100%;background:#fff;border-radius:99px;transition:width linear;}
+.story-media{width:100%;height:100%;object-fit:cover;}
+.story-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;justify-content:space-between;}
+.story-header{padding:44px 14px 10px;display:flex;align-items:center;gap:9px;}
+.story-footer{padding:14px;}
 .ftabs{display:flex;gap:7px;overflow-x:auto;padding:0 14px 12px;border-bottom:1px solid var(--bord);-webkit-overflow-scrolling:touch;}
 .ftab{flex-shrink:0;border-radius:99px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--bord);background:var(--card);color:var(--text2);}
 .ftab.a{background:var(--green);color:var(--bg);border-color:var(--green);}
@@ -319,7 +328,7 @@ var S={
   pTipo:"post",pTxt:"",
   comentando:null,vplay:null,
   tornAba:"abertos",tornSel:null,tornCriar:false,
-  msgSel:null,msgChat:[],msgChats:{},
+  msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,
   perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑"
 };
 
@@ -764,6 +773,7 @@ function _initFirebase(){
       _carregarSeguindo();
       _carregarJogadoresFirestore();
       _iniciarNotificacoesRealtime();
+      _iniciarStoriesRealtime();
       _carregarConversasFirestore();
     } else {
       // Para escuta quando deslogar
@@ -822,6 +832,235 @@ function _iniciarFeedRealtime(){
           D.feed=posts;render();
         });
     });
+}
+
+/* ── STORIES FIRESTORE ───────────────────────────── */
+var _storiesUnsub = null;
+
+function _iniciarStoriesRealtime(){
+  if(!_fbDb||!S.fbUser)return;
+  if(_storiesUnsub){_storiesUnsub();}
+  // Busca stories das últimas 24h
+  var limite = new Date(Date.now() - 24*60*60*1000);
+  _storiesUnsub = _fbDb.collection('stories')
+    .where('expira','>', firebase.firestore.Timestamp.fromDate(limite))
+    .orderBy('expira','asc')
+    .onSnapshot(function(snap){
+      // Agrupa por usuário — cada usuário tem 1 story no topo
+      var mapa = {};
+      snap.forEach(function(doc){
+        var d = doc.data();
+        d.id = doc.id;
+        d.hora = _tempoRelativo(d.timestamp);
+        // Pega o story mais recente de cada usuário
+        if(!mapa[d.uid] || d.timestamp > mapa[d.uid].timestamp){
+          mapa[d.uid] = d;
+        }
+      });
+      // Reconstrói D.stories mantendo o "Você" no início
+      var stVoce = {id:'add',user:'Você',av:S.perfFotoUrl||S.perfAv||'🧑',add:true,fotoUrl:S.perfFotoUrl||null,cor:'var(--green)'};
+      var outros = Object.values(mapa)
+        .filter(function(s){ return s.uid !== S.fbUser.uid; })
+        .map(function(s){
+          var cache = _usuariosCache[s.uid]||{};
+          return {
+            id: s.id,
+            uid: s.uid,
+            user: s.nome||cache.nome||'Usuário',
+            av: cache.fotoUrl||cache.av||'🧑',
+            fotoUrl: cache.fotoUrl||null,
+            midiaUrl: s.midiaUrl,
+            midiaType: s.midiaType,
+            cor: 'linear-gradient(135deg,#FF6B6B,#FF8E53)',
+            hora: s.hora,
+            storyData: s
+          };
+        });
+      // Verifica se o usuário atual tem story
+      var meuStory = mapa[S.fbUser.uid];
+      if(meuStory){
+        stVoce.temStory = true;
+        stVoce.midiaUrl = meuStory.midiaUrl;
+        stVoce.midiaType = meuStory.midiaType;
+        stVoce.storyData = meuStory;
+        stVoce.cor = 'linear-gradient(135deg,var(--green),var(--teal))';
+      }
+      D.stories = [stVoce].concat(outros);
+      render();
+    }, function(){});
+}
+
+function publicarStory(){
+  if(!S.stMidiaUrl){toast('Adicione uma foto ou vídeo ao story! 📸');return;}
+  if(!_fbDb||!S.fbUser){toast('Faça login para publicar');return;}
+  var agora = firebase.firestore.Timestamp.now();
+  var expira = new Date(Date.now() + 24*60*60*1000);
+  _fbDb.collection('stories').add({
+    uid: S.fbUser.uid,
+    nome: S.perfNome,
+    midiaUrl: S.stMidiaUrl,
+    midiaType: S.stMidiaTipo||'foto',
+    timestamp: agora,
+    expira: firebase.firestore.Timestamp.fromDate(expira)
+  }).then(function(){
+    S.stMidiaUrl = null;
+    S.stMidiaTipo = null;
+    closeModal();
+    toast('Story publicado! ✓ Expira em 24h ⏱️');
+  }).catch(function(err){
+    toast('Erro ao publicar story: '+err.message);
+  });
+}
+
+function openStoryModal(){
+  S.stMidiaUrl = null;
+  S.stMidiaTipo = null;
+  var o = '<div style="font-weight:800;font-size:16px;margin:0 0 16px">📱 Novo Story</div>';
+  if(S.stMidiaUrl){
+    if(S.stMidiaTipo==='video'){
+      o += '<video src="'+S.stMidiaUrl+'" style="width:100%;border-radius:14px;max-height:260px;margin-bottom:12px" controls playsinline></video>';
+    } else {
+      o += '<div style="position:relative;margin-bottom:12px"><img src="'+S.stMidiaUrl+'" style="width:100%;border-radius:14px;max-height:280px;object-fit:cover"><button onclick="S.stMidiaUrl=null;openStoryModal()" style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:28px;height:28px;cursor:pointer">✕</button></div>';
+    }
+  } else {
+    o += '<div style="background:var(--surf);border:2px dashed var(--bord);border-radius:14px;padding:30px;text-align:center;margin-bottom:14px">';
+    o += '<div style="font-size:40px;margin-bottom:8px">📸</div>';
+    o += '<div style="color:var(--muted);font-size:13px">Escolha uma foto ou vídeo</div>';
+    o += '</div>';
+  }
+  o += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">';
+  o += '<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:12px 5px;cursor:pointer"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleStoryMidia(this)"><div style="font-size:24px">📷</div><div style="font-size:10px;font-weight:700;text-align:center">Câmera<br>Foto</div></label>';
+  o += '<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:12px 5px;cursor:pointer"><input type="file" accept="video/*" capture="environment" style="display:none" onchange="handleStoryMidia(this)"><div style="font-size:24px">🎬</div><div style="font-size:10px;font-weight:700;text-align:center">Câmera<br>Vídeo</div></label>';
+  o += '<label style="display:flex;flex-direction:column;align-items:center;gap:5px;background:var(--card);border:1.5px solid var(--bord);border-radius:12px;padding:12px 5px;cursor:pointer"><input type="file" accept="image/*,video/*" style="display:none" onchange="handleStoryMidia(this)"><div style="font-size:24px">🖼️</div><div style="font-size:10px;font-weight:700;text-align:center">Galeria</div></label>';
+  o += '</div>';
+  o += '<div style="display:flex;gap:9px">';
+  o += '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>';
+  o += '<button class="btn bp" style="flex:1" onclick="publicarStory()" '+(S.stMidiaUrl?'':'disabled style="flex:1;opacity:.5"')+'>Publicar ✓</button>';
+  o += '</div>';
+  showModal(o);
+}
+
+function handleStoryMidia(input){
+  var file = input.files[0];
+  if(!file)return;
+  S.stMidiaTipo = file.type.startsWith('video') ? 'video' : 'foto';
+  if(file.type.startsWith('image/')){
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(e){
+      img.onload = function(){
+        var canvas = document.createElement('canvas');
+        var maxW = 720, maxH = 1280;
+        var w = img.width, h = img.height;
+        if(w/h > maxW/maxH){ h = Math.round(h*maxW/w); w = maxW; }
+        else { w = Math.round(w*maxH/h); h = maxH; }
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        S.stMidiaUrl = canvas.toDataURL('image/jpeg',0.80);
+        openStoryModal();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    var reader2 = new FileReader();
+    reader2.onload = function(e){ S.stMidiaUrl = e.target.result; openStoryModal(); };
+    reader2.readAsDataURL(file);
+  }
+}
+
+// Visor de story em tela cheia
+var _storyTimer = null;
+var _storyIdx = 0;
+var _storyLista = [];
+
+function verStory(storyData){
+  if(!storyData||!storyData.midiaUrl) return;
+  // Monta lista de stories disponíveis
+  _storyLista = D.stories.filter(function(s){ return !s.add && s.midiaUrl; });
+  _storyIdx = _storyLista.findIndex(function(s){ return s.id === storyData.id; });
+  if(_storyIdx < 0) _storyIdx = 0;
+  _mostrarStoryViewer();
+}
+
+function _mostrarStoryViewer(){
+  if(_storyIdx < 0 || _storyIdx >= _storyLista.length){ fecharStory(); return; }
+  var s = _storyLista[_storyIdx];
+  S.stVisto = S.stVisto||{};
+  S.stVisto[s.id] = true;
+
+  var total = _storyLista.length;
+  var progressBars = '';
+  for(var i=0;i<total;i++){
+    var pct = i < _storyIdx ? '100' : i === _storyIdx ? '0' : '0';
+    progressBars += '<div class="story-prog-seg"><div class="story-prog-fill" id="spf'+i+'" style="width:'+pct+'%"></div></div>';
+  }
+
+  var avHtml = s.fotoUrl
+    ? '<img src="'+s.fotoUrl+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #fff">'
+    : '<div style="width:36px;height:36px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:18px">'+( s.av||'🧑')+'</div>';
+
+  var mediaHtml = s.midiaType==='video'
+    ? '<video id="story-media" src="'+s.midiaUrl+'" class="story-media" autoplay playsinline muted loop></video>'
+    : '<img id="story-media" src="'+s.midiaUrl+'" class="story-media">';
+
+  var viewer = document.getElementById('story-viewer');
+  if(!viewer){
+    viewer = document.createElement('div');
+    viewer.id = 'story-viewer';
+    viewer.className = 'story-viewer';
+    document.body.appendChild(viewer);
+  }
+
+  viewer.innerHTML =
+    mediaHtml +
+    '<div class="story-overlay">' +
+      '<div>' +
+        '<div class="story-progress-bar">'+progressBars+'</div>' +
+        '<div class="story-header">' +
+          avHtml +
+          '<div style="flex:1"><div style="color:#fff;font-weight:700;font-size:13px">'+esc(s.user)+'</div>' +
+          '<div style="color:rgba(255,255,255,.7);font-size:11px">'+(s.hora||'agora')+'</div></div>' +
+          '<button onclick="fecharStory()" style="background:rgba(0,0,0,.4);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;height:100%;position:absolute;top:0;left:0;right:0">' +
+        '<div style="flex:1" onclick="_prevStory()"></div>' +
+        '<div style="flex:1" onclick="_nextStory()"></div>' +
+      '</div>' +
+    '</div>';
+
+  // Barra de progresso animada (5s para foto, 15s para vídeo)
+  var dur = s.midiaType==='video' ? 15000 : 5000;
+  if(_storyTimer) clearInterval(_storyTimer);
+  var start = Date.now();
+  var fill = document.getElementById('spf'+_storyIdx);
+  _storyTimer = setInterval(function(){
+    var elapsed = Date.now() - start;
+    var pct = Math.min(100, (elapsed/dur)*100);
+    if(fill) fill.style.width = pct+'%';
+    if(pct >= 100){ clearInterval(_storyTimer); _nextStory(); }
+  }, 50);
+}
+
+function _nextStory(){
+  if(_storyTimer) clearInterval(_storyTimer);
+  _storyIdx++;
+  if(_storyIdx >= _storyLista.length){ fecharStory(); return; }
+  _mostrarStoryViewer();
+}
+
+function _prevStory(){
+  if(_storyTimer) clearInterval(_storyTimer);
+  _storyIdx = Math.max(0, _storyIdx-1);
+  _mostrarStoryViewer();
+}
+
+function fecharStory(){
+  if(_storyTimer){ clearInterval(_storyTimer); _storyTimer=null; }
+  var v = document.getElementById('story-viewer');
+  if(v) v.remove();
+  render();
 }
 
 /* ── CACHE DE USUÁRIOS ───────────────────────────── */
@@ -1484,19 +1723,23 @@ function screenSocial(){
   var o='<div class="fu">';
 
   // Stories
+  // Stories
   o+='<div class="stor-row">';
   D.stories.forEach(function(s){
-    var click=s.add?'openPostModal()':'setStVisto('+s.id+')';
-    var ring=s.add?'':S.stVisto[s.id]?'background:var(--muted2)':'background:linear-gradient(135deg,'+s.cor+')';
-    // Se é o story "Você" (add=true) e tem foto, mostra a foto
-    var avContent;
-    if(s.add&&S.perfFotoUrl){
-      avContent='<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    var ring, click, avContent;
+    if(s.add){
+      ring = s.temStory ? 'background:linear-gradient(135deg,var(--green),var(--teal))' : 'background:var(--bord)';
+      click = s.temStory ? 'verStory('+JSON.stringify(s.storyData||{})+')' : 'openStoryModal()';
+      avContent = S.perfFotoUrl ? '<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(S.perfAv||'🧑')+'</span>';
+      if(!s.temStory) avContent += '<div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg)">+</div>';
     } else {
-      avContent=s.av;
+      var visto = S.stVisto && S.stVisto[s.id];
+      ring = visto ? 'background:var(--muted2)' : 'background:'+s.cor;
+      click = 'verStory('+JSON.stringify(s.storyData||{id:s.id,midiaUrl:s.midiaUrl,midiaType:s.midiaType,nome:s.user,uid:s.uid})+')';
+      avContent = s.fotoUrl ? '<img src="'+s.fotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(s.av||'🧑')+'</span>';
     }
-    o+='<div class="stor" onclick="'+click+'"><div class="stor-ring" style="'+ring+'"><div class="stor-av">'+avContent+'</div></div>';
-    o+='<span class="stor-lb" style="color:'+(S.stVisto[s.id]?'var(--muted)':'var(--text2)')+'">'+esc(s.user)+'</span></div>';
+    o+='<div class="stor" onclick="'+click+'" style="position:relative"><div class="stor-ring" style="'+ring+'"><div class="stor-av" style="position:relative">'+avContent+'</div></div>';
+    o+='<span class="stor-lb">'+esc(s.user)+'</span></div>';
   });
   o+='</div>';
 
