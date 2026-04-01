@@ -1026,8 +1026,16 @@ var _storyLista = [];
 
 function verStory(storyData){
   if(!storyData||!storyData.midiaUrl) return;
-  // Monta lista de stories disponíveis
-  _storyLista = D.stories.filter(function(s){ return !s.add && s.midiaUrl; });
+  // Monta lista: todos os stories com midia (inclui o "Voce" via storyData)
+  _storyLista = [];
+  D.stories.forEach(function(s){
+    if(s.add && s.temStory && s.storyData && s.storyData.midiaUrl){
+      // Story do "Voce" - usa os dados reais do Firestore
+      _storyLista.push(s.storyData);
+    } else if(!s.add && s.midiaUrl){
+      _storyLista.push(s);
+    }
+  });
   _storyIdx = _storyLista.findIndex(function(s){ return s.id === storyData.id; });
   if(_storyIdx < 0) _storyIdx = 0;
   _mostrarStoryViewer();
@@ -1046,13 +1054,24 @@ function _mostrarStoryViewer(){
     progressBars += '<div class="story-prog-seg"><div class="story-prog-fill" id="spf'+i+'" style="width:'+pct+'%"></div></div>';
   }
 
-  var avHtml = s.fotoUrl
-    ? '<img src="'+s.fotoUrl+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #fff">'
-    : '<div style="width:36px;height:36px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:18px">'+( s.av||'🧑')+'</div>';
+  // Normaliza campos: storyData do Firestore usa .nome, D.stories usa .user
+  var sNome = s.user || s.nome || 'Usuário';
+  var sFoto = s.fotoUrl || null;
+  var sAv   = s.av || '🧑';
+  var sHora = s.hora || _tempoRelativo(s.timestamp) || 'agora';
+  // Pega foto do cache se não tiver
+  if(!sFoto && s.uid && _usuariosCache[s.uid]){
+    sFoto = _usuariosCache[s.uid].fotoUrl || null;
+  }
 
-  var mediaHtml = s.midiaType==='video'
-    ? '<video id="story-media" src="'+s.midiaUrl+'" class="story-media" autoplay playsinline muted loop></video>'
-    : '<img id="story-media" src="'+s.midiaUrl+'" class="story-media">';
+  var avHtml = sFoto
+    ? '<img src="'+sFoto+'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid #fff">'
+    : '<div style="width:36px;height:36px;border-radius:50%;background:var(--surf);display:flex;align-items:center;justify-content:center;font-size:18px">'+sAv+'</div>';
+
+  var mediaSrc = s.midiaUrl || '';
+  var mediaHtml = (s.midiaType==='video')
+    ? '<video id="story-media" src="'+mediaSrc+'" class="story-media" autoplay playsinline muted loop></video>'
+    : '<img id="story-media" src="'+mediaSrc+'" class="story-media">';
 
   var viewer = document.getElementById('story-viewer');
   if(!viewer){
@@ -1069,8 +1088,8 @@ function _mostrarStoryViewer(){
         '<div class="story-progress-bar">'+progressBars+'</div>' +
         '<div class="story-header">' +
           avHtml +
-          '<div style="flex:1"><div style="color:#fff;font-weight:700;font-size:13px">'+esc(s.user)+'</div>' +
-          '<div style="color:rgba(255,255,255,.7);font-size:11px">'+(s.hora||'agora')+'</div></div>' +
+          '<div style="flex:1"><div style="color:#fff;font-weight:700;font-size:13px">'+esc(sNome)+'</div>' +
+          '<div style="color:rgba(255,255,255,.7);font-size:11px">'+sHora+'</div></div>' +
           '<button onclick="fecharStory()" style="background:rgba(0,0,0,.4);border:none;color:#fff;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>' +
         '</div>' +
       '</div>' +
