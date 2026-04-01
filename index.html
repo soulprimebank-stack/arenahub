@@ -1028,8 +1028,12 @@ function verStoryId(id){
   // Busca dados do story pelo ID em D.stories (evita passar base64 no onclick)
   var found = null;
   D.stories.forEach(function(s){
-    if(s.add && s.storyData && s.storyData.id === id){ found = s.storyData; }
-    else if(!s.add && s.id === id){ found = {id:s.id,midiaUrl:s.midiaUrl,midiaType:s.midiaType,user:s.user,nome:s.user,fotoUrl:s.fotoUrl,uid:s.uid,hora:s.hora}; }
+    if(s.id === id){
+      // Story do "Voce" (add:true) — usa storyData do Firestore
+      if(s.add && s.storyData && s.storyData.midiaUrl){ found = s.storyData; }
+      // Stories de outros usuarios
+      else if(!s.add && s.midiaUrl){ found = {id:s.id,midiaUrl:s.midiaUrl,midiaType:s.midiaType,user:s.user,nome:s.user,fotoUrl:s.fotoUrl,uid:s.uid,hora:s.hora}; }
+    }
   });
   if(found && found.midiaUrl){ verStory(found); }
 }
