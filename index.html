@@ -1101,20 +1101,26 @@ function _mostrarStoryViewer(){
 
   // Barra de progresso animada (5s para foto, 15s para vídeo)
   var dur = (s.midiaType==='video') ? 15000 : 5000;
-  if(_storyTimer) clearInterval(_storyTimer);
-  _storyTimer = null;
-  var start = Date.now();
-  var _fillId = 'spf'+_storyIdx;
-  // Aguarda um tick para o DOM renderizar antes de iniciar o timer
+  if(_storyTimer) { clearInterval(_storyTimer); _storyTimer = null; }
+  var _sessaoIdx = _storyIdx; // captura o índice desta sessão
+  var _fillId = 'spf' + _storyIdx;
+  // Aguarda DOM renderizar, depois inicia timer
   setTimeout(function(){
+    // Se o índice mudou entre o setTimeout e agora, aborta
+    if(_storyIdx !== _sessaoIdx) return;
+    // Se o viewer sumiu, aborta
+    if(!document.getElementById('story-viewer')) return;
+    var start = Date.now();
     _storyTimer = setInterval(function(){
+      // Segurança: se índice mudou ou viewer sumiu, para
+      if(_storyIdx !== _sessaoIdx){ clearInterval(_storyTimer); _storyTimer = null; return; }
       var fill = document.getElementById(_fillId);
       var elapsed = Date.now() - start;
       var pct = Math.min(100, (elapsed / dur) * 100);
       if(fill) fill.style.width = pct + '%';
       if(pct >= 100){ clearInterval(_storyTimer); _storyTimer = null; _nextStory(); }
-    }, 50);
-  }, 50);
+    }, 100);
+  }, 80);
 }
 
 function _nextStory(){
