@@ -1100,15 +1100,20 @@ function _mostrarStoryViewer(){
     '</div>';
 
   // Barra de progresso animada (5s para foto, 15s para vídeo)
-  var dur = s.midiaType==='video' ? 15000 : 5000;
+  var dur = (s.midiaType==='video') ? 15000 : 5000;
   if(_storyTimer) clearInterval(_storyTimer);
+  _storyTimer = null;
   var start = Date.now();
-  var fill = document.getElementById('spf'+_storyIdx);
-  _storyTimer = setInterval(function(){
-    var elapsed = Date.now() - start;
-    var pct = Math.min(100, (elapsed/dur)*100);
-    if(fill) fill.style.width = pct+'%';
-    if(pct >= 100){ clearInterval(_storyTimer); _nextStory(); }
+  var _fillId = 'spf'+_storyIdx;
+  // Aguarda um tick para o DOM renderizar antes de iniciar o timer
+  setTimeout(function(){
+    _storyTimer = setInterval(function(){
+      var fill = document.getElementById(_fillId);
+      var elapsed = Date.now() - start;
+      var pct = Math.min(100, (elapsed / dur) * 100);
+      if(fill) fill.style.width = pct + '%';
+      if(pct >= 100){ clearInterval(_storyTimer); _storyTimer = null; _nextStory(); }
+    }, 50);
   }, 50);
 }
 
