@@ -1868,14 +1868,22 @@ function screenSocial(){
       click = s.temStory ? "verStoryId('"+s.id+"')" : 'openStoryModal()';
       avContent = S.perfFotoUrl ? '<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(S.perfAv||'🧑')+'</span>';
       // Sempre mostra o "+" — se ja tem story, fica menor e abre novo story
-      avContent += '<div onclick="event.stopPropagation();openStoryModal()" style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg);cursor:pointer">+</div>';
+      avContent += '<div onclick="event.stopPropagation();openStoryModal()" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;cursor:pointer;z-index:10">+</div>';
     } else {
       var visto = S.stVisto && S.stVisto[s.id];
       ring = visto ? 'background:var(--muted2)' : 'background:'+s.cor;
       click = "verStoryId('"+s.id+"')";
       avContent = s.fotoUrl ? '<img src="'+s.fotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(s.av||'🧑')+'</span>';
     }
-    o+='<div class="stor" onclick="'+click+'" style="position:relative"><div class="stor-ring" style="'+ring+'"><div class="stor-av" style="position:relative">'+avContent+'</div></div>';
+    // Separar o botão "+" do avContent para posicioná-lo fora do stor-av
+    var maisBtn = '';
+    if(s.add){
+      var avSemMais = avContent.replace(/<div onclick[^>]+>\+<\/div>/, '');
+      maisBtn = '<div onclick="event.stopPropagation();openStoryModal()" style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;cursor:pointer;z-index:5">+</div>';
+      o+='<div class="stor" onclick="'+click+'" style="position:relative"><div class="stor-ring" style="'+ring+'"><div class="stor-av" style="position:relative">'+avSemMais+'</div></div>'+maisBtn;
+    } else {
+      o+='<div class="stor" onclick="'+click+'" style="position:relative"><div class="stor-ring" style="'+ring+'"><div class="stor-av" style="position:relative">'+avContent+'</div></div>';
+    }
     o+='<span class="stor-lb">'+esc(s.user)+'</span></div>';
   });
   o+='</div>';
