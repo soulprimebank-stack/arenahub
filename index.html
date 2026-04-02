@@ -876,7 +876,7 @@ function _iniciarStoriesRealtime(){
             storyData: s
           };
         });
-      // Verifica se o usuário atual tem story
+      // Verifica se o usuário atual tem story(s) — guarda todos para navegação
       var meuStory = mapa[S.fbUser.uid];
       if(meuStory){
         stVoce.temStory = true;
@@ -884,6 +884,18 @@ function _iniciarStoriesRealtime(){
         stVoce.midiaType = meuStory.midiaType;
         stVoce.storyData = meuStory;
         stVoce.cor = 'linear-gradient(135deg,var(--green),var(--teal))';
+        // Guardar lista completa de stories do próprio usuário para navegação
+        stVoce.meusStories = [];
+        snap.forEach(function(doc){
+          var d = doc.data();
+          if(d.uid === S.fbUser.uid){
+            d.id = doc.id;
+            d.hora = _tempoRelativo(d.timestamp);
+            stVoce.meusStories.push(d);
+          }
+        });
+        // Ordena do mais antigo para mais recente (ordem de exibição)
+        stVoce.meusStories.sort(function(a,b){ return a.timestamp - b.timestamp; });
       }
       D.stories = [stVoce].concat(outros);
       render();
@@ -1027,15 +1039,45 @@ var _storyLista = [];
 function verStoryId(id){
   // Busca dados do story pelo ID em D.stories (evita passar base64 no onclick)
   var found = null;
+  var listaCompleta = null;
   D.stories.forEach(function(s){
     if(s.id === id){
-      // Story do "Voce" (add:true) — usa storyData do Firestore
-      if(s.add && s.storyData && s.storyData.midiaUrl){ found = s.storyData; }
-      // Stories de outros usuarios
-      else if(!s.add && s.midiaUrl){ found = {id:s.id,midiaUrl:s.midiaUrl,midiaType:s.midiaType,user:s.user,nome:s.user,fotoUrl:s.fotoUrl,uid:s.uid,hora:s.hora}; }
+      if(s.add && s.storyData && s.storyData.midiaUrl){
+        found = s.storyData;
+        // Se tiver lista completa de stories, usa ela para navegação
+        if(s.meusStories && s.meusStories.length > 0) listaCompleta = s.meusStories;
+      } else if(!s.add && s.midiaUrl){
+        found = {id:s.id,midiaUrl:s.midiaUrl,midiaType:s.midiaType,user:s.user,nome:s.user,fotoUrl:s.fotoUrl,uid:s.uid,hora:s.hora};
+      }
     }
   });
-  if(found && found.midiaUrl){ verStory(found); }
+  if(found && found.midiaUrl){
+    if(listaCompleta && listaCompleta.length > 1){
+      // Múltiplos stories: mostra em sequência
+      verStoryLista(listaCompleta, found.id);
+    } else {
+      verStory(found);
+    }
+  }
+}
+
+function verStoryLista(lista, startId){
+  // Exibe lista de stories em sequência (vários stories do mesmo usuário)
+  _storyLista = lista.map(function(s){
+    return {
+      id: s.id,
+      midiaUrl: s.midiaUrl,
+      midiaType: s.midiaType,
+      user: s.nome || 'Você',
+      nome: s.nome || 'Você',
+      fotoUrl: S.perfFotoUrl || null,
+      uid: s.uid,
+      hora: s.hora || _tempoRelativo(s.timestamp)
+    };
+  });
+  _storyIdx = _storyLista.findIndex(function(s){ return s.id === startId; });
+  if(_storyIdx < 0) _storyIdx = 0;
+  _mostrarStoryViewer();
 }
 
 function verStory(storyData){
@@ -1825,7 +1867,8 @@ function screenSocial(){
       ring = s.temStory ? 'background:linear-gradient(135deg,var(--green),var(--teal))' : 'background:var(--bord)';
       click = s.temStory ? "verStoryId('"+s.id+"')" : 'openStoryModal()';
       avContent = S.perfFotoUrl ? '<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(S.perfAv||'🧑')+'</span>';
-      if(!s.temStory) avContent += '<div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg)">+</div>';
+      // Sempre mostra o "+" — se ja tem story, fica menor e abre novo story
+      avContent += '<div onclick="event.stopPropagation();openStoryModal()" style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg);cursor:pointer">+</div>';
     } else {
       var visto = S.stVisto && S.stVisto[s.id];
       ring = visto ? 'background:var(--muted2)' : 'background:'+s.cor;
