@@ -1823,13 +1823,13 @@ function screenSocial(){
     var ring, click, avContent;
     if(s.add){
       ring = s.temStory ? 'background:linear-gradient(135deg,var(--green),var(--teal))' : 'background:var(--bord)';
-      click = s.temStory ? 'verStoryId("'+s.id+'")' : 'openStoryModal()';
+      click = s.temStory ? "verStoryId('"+s.id+"')" : 'openStoryModal()';
       avContent = S.perfFotoUrl ? '<img src="'+S.perfFotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(S.perfAv||'🧑')+'</span>';
       if(!s.temStory) avContent += '<div style="position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--green);border-radius:50%;border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:var(--bg)">+</div>';
     } else {
       var visto = S.stVisto && S.stVisto[s.id];
       ring = visto ? 'background:var(--muted2)' : 'background:'+s.cor;
-      click = 'verStoryId("'+s.id+'")';
+      click = "verStoryId('"+s.id+"')";
       avContent = s.fotoUrl ? '<img src="'+s.fotoUrl+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:22px">'+(s.av||'🧑')+'</span>';
     }
     o+='<div class="stor" onclick="'+click+'" style="position:relative"><div class="stor-ring" style="'+ring+'"><div class="stor-av" style="position:relative">'+avContent+'</div></div>';
