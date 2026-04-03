@@ -279,6 +279,8 @@ var D={
   jogadores:[],
   times:[],
   campos:[],
+  camposFirestore:[],camposModo:'lista',camposCarregando:false,camposBusca:'',camposFiltro:'todos',
+  campoLat:null,campoLng:null,campoGeoOk:false,
   horarios:[],
   feed:[],
   stories:[
@@ -773,6 +775,10 @@ function _initFirebase(){
       _carregarSeguindo();
       _carregarJogadoresFirestore();
       _iniciarNotificacoesRealtime();
+    // Verificar se há campos no Firestore, senão fazer seed
+    _fbDb.collection('campos').limit(1).get().then(function(snap){
+      if(snap.empty) _seedCamposGoiania();
+    });
       _iniciarStoriesRealtime();
       _carregarConversasFirestore();
     } else {
@@ -1215,6 +1221,27 @@ function _carregarUsuarioCache(uid){
 }
 
 /* ── PERFIL NO FIRESTORE ─────────────────────────── */
+function _seedCamposGoiania(){
+  // Seed de campos reais de Goiânia no Firestore (só roda uma vez)
+  if(!_fbDb) return;
+  var campos = [
+    {nome:'Arena Goiânia',bairro:'Setor Bueno',end:'R. T-63, 500 - Setor Bueno',lat:-16.7080,lng:-49.2620,preco:120,nota:4.7,avs:38,img:'🏟️',cor:'#0a2a0a',cor2:'#061a06',grass:'Grama natural',ilum:true,vestiario:true,estac:true,coberto:false,aberto:true},
+    {nome:'Society do Cerrado',bairro:'Jardim Goiás',end:'Av. T-4, 1200 - Jardim Goiás',lat:-16.7180,lng:-49.2450,preco:80,nota:4.4,avs:22,img:'⚽',cor:'#0d2b0d',cor2:'#071a07',grass:'Grama sintética',ilum:true,vestiario:false,estac:true,coberto:false,aberto:true},
+    {nome:'Futebol Park',bairro:'Setor Marista',end:'R. 9, 450 - Setor Marista',lat:-16.7020,lng:-49.2580,preco:100,nota:4.5,avs:57,img:'🥅',cor:'#1a2a0a',cor2:'#0f1a06',grass:'Grama sintética',ilum:true,vestiario:true,estac:false,coberto:false,aberto:true,promo:true},
+    {nome:'Campo do Parque',bairro:'Parque Amazônia',end:'Av. Perimetral Norte, 1800',lat:-16.6750,lng:-49.2900,preco:60,nota:4.1,avs:15,img:'🌿',cor:'#0a1a2a',cor2:'#061014',grass:'Grama natural',ilum:false,vestiario:false,estac:true,coberto:false,aberto:true},
+    {nome:'Arena Coberta VIP',bairro:'Setor Oeste',end:'R. 88, 300 - Setor Oeste',lat:-16.6900,lng:-49.2800,preco:150,nota:4.9,avs:84,img:'🏗️',cor:'#2a1a0a',cor2:'#1a0f06',grass:'Grama sintética',ilum:true,vestiario:true,estac:true,coberto:true,aberto:true},
+    {nome:'Pelada do Bairro',bairro:'Vila Nova',end:'Rua das Flores, 100 - Vila Nova',lat:-16.7300,lng:-49.2300,preco:45,nota:3.9,avs:11,img:'🏃',cor:'#2a0a1a',cor2:'#1a060f',grass:'Saibro',ilum:false,vestiario:false,estac:false,coberto:false,aberto:true}
+  ];
+  var batch = _fbDb.batch();
+  campos.forEach(function(c){
+    var ref = _fbDb.collection('campos').doc();
+    batch.set(ref, c);
+  });
+  batch.commit().then(function(){
+    console.log('Campos seed OK');
+  });
+}
+
 function _carregarPerfilFirestore(uid){
   if(!_fbDb||!uid)return;
   _fbDb.collection('usuarios').doc(uid).get()
@@ -2462,28 +2489,219 @@ function screenCampos(){
   if(S.cEtapa==='confirmado')return screenCampoConfirmado();
   if(S.cEtapa==='pagamento')return screenPagamento();
   if(S.cEtapa==='campo'&&S.cSel)return screenCampoDetalhe(S.cSel);
-  var dest=D.campos.filter(function(c){return c.promo&&c.promo.dest;});
-  var o='<div class="fu" style="padding:0 14px">';
-  o+='<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px"><span class="stl">Campos Disponíveis</span><button class="btn bp bsm" onclick="S.cCadastr=true;render()">+ Cadastrar</button></div>';
-  if(dest.length>0){
-    o+='<div style="color:var(--pink);font-size:12px;font-weight:800;margin:0 0 9px;text-transform:uppercase;letter-spacing:.5px">🔥 Em destaque</div>';
-    dest.forEach(function(c){
-      o+='<div class="card tap" style="display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:9px;background:linear-gradient(135deg,rgba(255,77,141,.1),var(--card));border-color:rgba(255,77,141,.25)" onclick="openCampo('+c.id+')">';
-      o+='<div style="font-size:36px">'+c.img+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(c.nome)+'</div><div style="color:var(--pink);font-weight:700;font-size:12px;margin-top:2px">'+esc(c.promo.desc)+'</div></div>';
-      o+='<div style="text-align:right">'+pl('R$ '+c.preco+'/h','var(--pink)')+'<div style="color:var(--muted);font-size:10px;margin-top:3px">até '+c.promo.val+'</div></div></div>';
-    });
+
+  // Carregar campos do Firestore na primeira vez
+  if(!S.camposCarregando && D.camposFirestore.length===0){
+    _carregarCamposFirestore();
   }
-  D.campos.forEach(function(c){
-    o+='<div class="card tap" style="margin-bottom:11px" onclick="openCampo('+c.id+')">';
-    o+='<div class="mini-gal">'+c.fotos.slice(0,4).map(function(f){return'<div class="mg-c">'+f+'</div>';}).join('')+'</div>';
-    o+='<div style="display:flex;justify-content:space-between;align-items:flex-start">';
-    o+='<div style="flex:1"><div style="font-weight:800;font-size:15px;margin-bottom:2px">'+esc(c.nome)+'</div><div style="color:var(--muted);font-size:12px;margin-bottom:5px">📍 '+esc(c.end)+'</div>'+stars(c.nota,11);
-    if(c.promo)o+='<div style="margin-top:5px">'+pl('🔥 '+c.promo.desc,'var(--pink)')+'</div>';
-    o+='</div><div style="text-align:right;flex-shrink:0;margin-left:11px"><div style="color:var(--green);font-weight:900;font-size:19px;margin-bottom:1px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:11px;margin-bottom:5px">por hora</div>'+pl(c.vagas+' vagas','#4D9EFF')+'</div>';
-    o+='</div></div>';
+
+  var modo = S.camposModo || 'lista';
+  var filtro = S.camposFiltro || 'todos';
+  var busca = (S.camposBusca||'').toLowerCase();
+
+  // Fonte de dados: Firestore ou fallback mockado
+  var fonte = D.camposFirestore.length > 0 ? D.camposFirestore : D.campos;
+  var lista = fonte.filter(function(c){
+    var okBusca = !busca || (c.nome||'').toLowerCase().indexOf(busca)>=0 || (c.bairro||c.end||'').toLowerCase().indexOf(busca)>=0;
+    var okFiltro = filtro==='todos' || (filtro==='aberto' && c.aberto) || (filtro==='coberto' && c.coberto) || (filtro==='promo' && c.promo);
+    return okBusca && okFiltro;
   });
-  o+='</div>';
+
+  var o = '<div class="fu" style="padding:0">';
+
+  // Header fixo
+  o += '<div style="padding:14px 14px 0;position:sticky;top:0;background:var(--bg);z-index:10">';
+  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+  o += '<span class="stl">🏟️ Campos</span>';
+  o += '<div style="display:flex;gap:6px">';
+  o += '<button onclick="S.camposModo=\'mapa\';render();_initMapaCampos()" style="padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1.5px solid '+(modo==='mapa'?'var(--green)':'var(--bord)')+';background:'+(modo==='mapa'?'rgba(0,240,130,.15)':'var(--surf)')+';color:'+(modo==='mapa'?'var(--green)':'var(--text2)')+';cursor:pointer">🗺️ Mapa</button>';
+  o += '<button onclick="S.camposModo=\'lista\';render()" style="padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1.5px solid '+(modo==='lista'?'var(--green)':'var(--bord)')+';background:'+(modo==='lista'?'rgba(0,240,130,.15)':'var(--surf)')+';color:'+(modo==='lista'?'var(--green)':'var(--text2)')+';cursor:pointer">📋 Lista</button>';
+  o += '<button class="btn bp bsm" onclick="S.cCadastr=true;render()">+ Cadastrar</button>';
+  o += '</div></div>';
+
+  // Busca
+  o += '<div style="position:relative;margin-bottom:10px">';
+  o += '<input id="campos-busca" type="text" placeholder="🔍 Buscar campos..." value="'+esc(S.camposBusca||'')+'" oninput="S.camposBusca=this.value;render()" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:12px;border:1.5px solid var(--bord);background:var(--surf);color:var(--text);font-size:13px;outline:none">';
+  o += '</div>';
+
+  // Filtros
+  o += '<div style="display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none">';
+  [['todos','Todos'],['aberto','Aberto'],['coberto','Coberto'],['promo','🔥 Promoção']].forEach(function(f){
+    var act = filtro===f[0];
+    o += '<button onclick="S.camposFiltro=\''+f[0]+'\';render()" style="flex-shrink:0;padding:5px 14px;border-radius:99px;font-size:12px;font-weight:700;border:1.5px solid '+(act?'var(--green)':'var(--bord)')+';background:'+(act?'var(--green)':'var(--surf)')+';color:'+(act?'var(--bg)':'var(--text2)')+';cursor:pointer;white-space:nowrap">'+f[1]+'</button>';
+  });
+  o += '</div>';
+  o += '</div>'; // fim header
+
+  if(modo==='mapa'){
+    // Mapa Leaflet
+    o += '<div id="mapa-campos" style="height:340px;width:100%;background:var(--surf);position:relative">';
+    if(!S.campoGeoOk){
+      o += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:5">';
+      o += '<div style="font-size:36px">📍</div>';
+      o += '<div style="font-size:13px;color:var(--text2);text-align:center">Ative a localização<br>para ver campos próximos</div>';
+      o += '<button onclick="_pedirLocalizacao()" class="btn bp bsm">📍 Usar minha localização</button>';
+      o += '</div>';
+    }
+    o += '</div>';
+    // Lista abaixo do mapa
+    o += '<div style="padding:10px 14px 80px">';
+    if(S.campoGeoOk){
+      o += '<div style="font-size:12px;color:var(--muted);margin-bottom:10px">📍 '+(lista.length)+' campos encontrados perto de você</div>';
+    }
+  } else {
+    o += '<div style="padding:0 14px 80px">';
+    if(S.camposCarregando){
+      o += '<div style="text-align:center;padding:40px 0"><div style="font-size:32px;margin-bottom:8px">⏳</div><div style="color:var(--muted);font-size:13px">Buscando campos...</div></div>';
+    } else if(lista.length===0){
+      o += '<div style="text-align:center;padding:40px 0"><div style="font-size:36px;margin-bottom:8px">🏟️</div><div style="font-weight:700;margin-bottom:6px">Nenhum campo encontrado</div><div style="color:var(--muted);font-size:13px">Seja o primeiro a cadastrar<br>um campo na sua região!</div><button class="btn bp bsm" style="margin-top:14px" onclick="S.cCadastr=true;render()">+ Cadastrar Campo</button></div>';
+    }
+  }
+
+  // Renderizar cards
+  lista.forEach(function(c){
+    var dist = (c.distKm!==undefined) ? '<span style="color:var(--green);font-weight:700">📍 '+c.distKm.toFixed(1)+'km</span>' : '';
+    var nota = c.nota||0;
+    var avs = c.avs||0;
+    var stars_html = '';
+    for(var i=1;i<=5;i++) stars_html += '<span style="color:'+(i<=Math.round(nota)?'#FFBE00':'var(--bord)')+'">★</span>';
+
+    o += '<div class="card tap" style="margin-bottom:11px;padding:0;overflow:hidden" data-cid="'+c.id+'" onclick="openCampoFirestore(this.dataset.cid)">';
+    // Header colorido
+    o += '<div style="background:linear-gradient(135deg,'+(c.cor||'#1a472a')+','+(c.cor2||'#0f2d1a')+');padding:18px;display:flex;align-items:center;gap:12px">';
+    o += '<div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0">'+(c.img||'🏟️')+'</div>';
+    o += '<div style="flex:1"><div style="font-weight:800;font-size:15px;color:#fff;margin-bottom:2px">'+esc(c.nome||'Campo')+'</div>';
+    o += '<div style="color:rgba(255,255,255,.75);font-size:12px">📍 '+esc(c.bairro||c.end||'Goiânia')+'</div></div>';
+    if(c.aberto) o += '<span style="background:rgba(0,240,130,.2);color:#00F082;font-size:11px;font-weight:700;padding:3px 8px;border-radius:99px;border:1px solid rgba(0,240,130,.3)">Aberto</span>';
+    o += '</div>';
+    // Info
+    o += '<div style="padding:12px 14px">';
+    o += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    o += '<div>'+stars_html+' <span style="color:var(--muted);font-size:12px">'+nota.toFixed(1)+' ('+avs+')</span></div>';
+    o += '<div style="color:var(--green);font-weight:900;font-size:17px">R$ '+(c.preco||'--')+'<span style="color:var(--muted);font-size:11px;font-weight:400">/h</span></div>';
+    o += '</div>';
+    o += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    if(c.grass) o += '<span style="background:var(--surf);border:1px solid var(--bord);color:var(--text2);font-size:11px;padding:2px 8px;border-radius:99px">🌱 '+c.grass+'</span>';
+    if(c.ilum) o += '<span style="background:var(--surf);border:1px solid var(--bord);color:var(--text2);font-size:11px;padding:2px 8px;border-radius:99px">💡 Iluminado</span>';
+    if(c.vestiario) o += '<span style="background:var(--surf);border:1px solid var(--bord);color:var(--text2);font-size:11px;padding:2px 8px;border-radius:99px">🚿 Vestiário</span>';
+    if(c.estac) o += '<span style="background:var(--surf);border:1px solid var(--bord);color:var(--text2);font-size:11px;padding:2px 8px;border-radius:99px">🚗 Estacionamento</span>';
+    if(c.promo) o += '<span style="background:rgba(255,77,141,.1);border:1px solid rgba(255,77,141,.3);color:var(--pink);font-size:11px;padding:2px 8px;border-radius:99px">🔥 Promoção</span>';
+    if(!c.grass&&!c.ilum&&!c.vestiario&&!c.estac&&!c.promo) o += '<span style="color:var(--muted);font-size:12px">Sem informações adicionais</span>';
+    o += '</div>';
+    if(dist) o += '<div style="margin-top:8px;font-size:12px">'+dist+'</div>';
+    o += '</div>';
+    o += '</div>';
+  });
+
+  o += '</div>'; // fim padding div
+  o += '</div>'; // fim fu
   return o;
+}
+
+function _carregarCamposFirestore(){
+  if(!_fbDb) return;
+  S.camposCarregando = true;
+  _fbDb.collection('campos').orderBy('nome','asc').get().then(function(snap){
+    S.camposCarregando = false;
+    D.camposFirestore = [];
+    snap.forEach(function(doc){
+      var d = doc.data();
+      d.id = doc.id;
+      // Calcular distância se tiver geolocalização
+      if(S.campoLat && d.lat && d.lng){
+        d.distKm = _calcDistKm(S.campoLat, S.campoLng, d.lat, d.lng);
+      }
+      D.camposFirestore.push(d);
+    });
+    // Ordenar por distância se tiver localização
+    if(S.campoLat){
+      D.camposFirestore.sort(function(a,b){ return (a.distKm||999)-(b.distKm||999); });
+    }
+    render();
+    if(S.camposModo==='mapa') _initMapaCampos();
+  }).catch(function(e){
+    S.camposCarregando = false;
+    // Sem campos no Firestore ainda — mostra estado vazio
+    render();
+  });
+}
+
+function _pedirLocalizacao(){
+  if(!navigator.geolocation){ toast('Geolocalização não suportada'); return; }
+  toast('Obtendo localização... 📍');
+  navigator.geolocation.getCurrentPosition(function(pos){
+    S.campoLat = pos.coords.latitude;
+    S.campoLng = pos.coords.longitude;
+    S.campoGeoOk = true;
+    // Recalcular distâncias
+    D.camposFirestore.forEach(function(c){
+      if(c.lat && c.lng) c.distKm = _calcDistKm(S.campoLat, S.campoLng, c.lat, c.lng);
+    });
+    D.camposFirestore.sort(function(a,b){ return (a.distKm||999)-(b.distKm||999); });
+    render();
+    _initMapaCampos();
+  }, function(){
+    toast('Não foi possível obter localização');
+  });
+}
+
+function _calcDistKm(lat1,lng1,lat2,lng2){
+  var R=6371, dLat=(lat2-lat1)*Math.PI/180, dLng=(lng2-lng1)*Math.PI/180;
+  var a=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+var _mapaLeaflet = null;
+function _initMapaCampos(){
+  if(typeof L === 'undefined'){
+    // Leaflet ainda não carregou — carregar dinamicamente
+    var sc = document.createElement('script');
+    sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    sc.onload = function(){ _renderMapaCampos(); };
+    document.head.appendChild(sc);
+  } else {
+    _renderMapaCampos();
+  }
+}
+
+function _renderMapaCampos(){
+  var el = document.getElementById('mapa-campos');
+  if(!el) return;
+  // Destruir mapa anterior se existir
+  if(_mapaLeaflet){ _mapaLeaflet.remove(); _mapaLeaflet=null; }
+  // Centro: localização do usuário ou Goiânia
+  var lat = S.campoLat || -16.6869;
+  var lng = S.campoLng || -49.2648;
+  _mapaLeaflet = L.map('mapa-campos').setView([lat,lng],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap'
+  }).addTo(_mapaLeaflet);
+  // Pin do usuário
+  if(S.campoGeoOk){
+    var iconUser = L.divIcon({html:'<div style="width:18px;height:18px;border-radius:50%;background:#4D9EFF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
+    L.marker([lat,lng],{icon:iconUser}).addTo(_mapaLeaflet).bindPopup('Você está aqui');
+  }
+  // Pins dos campos
+  var campos = D.camposFirestore.length>0 ? D.camposFirestore : D.campos;
+  campos.forEach(function(c){
+    if(!c.lat||!c.lng) return;
+    var nota = c.nota||0;
+    var iconCampo = L.divIcon({
+      html:'<div style="background:#00F082;border:2px solid #fff;border-radius:10px;padding:4px 7px;font-size:11px;font-weight:800;color:#000;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)">🏟️ '+esc(c.nome||'Campo')+'</div>',
+      className:'',iconAnchor:[0,0]
+    });
+    L.marker([c.lat,c.lng],{icon:iconCampo}).addTo(_mapaLeaflet)
+      .bindPopup('<b>'+esc(c.nome||'Campo')+'</b><br>'+esc(c.bairro||c.end||'')+'<br>R$ '+(c.preco||'--')+'/h<br><button data-cid="'+c.id+'" onclick="openCampoFirestore(this.dataset.cid)" style="margin-top:6px;padding:4px 10px;background:#00F082;border:none;border-radius:6px;font-weight:700;cursor:pointer">Ver detalhes</button>')
+      .openPopup();
+  });
+}
+
+function openCampoFirestore(id){
+  var campos = D.camposFirestore.length>0 ? D.camposFirestore : D.campos;
+  for(var i=0;i<campos.length;i++){
+    if(campos[i].id===id){ S.cSel=campos[i]; break; }
+  }
+  S.cEtapa='campo'; S.cFotoIdx=0; S.cAbaDet='fotos'; render(); sc();
 }
 function screenCampoDetalhe(c){
   var disp=D.horarios.filter(function(h){return h.disp;});
