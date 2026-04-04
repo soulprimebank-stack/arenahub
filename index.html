@@ -401,7 +401,7 @@ function screenBusca(){
   o+=section('Jogadores',jogs,function(j){return '<div class="ri" onclick="toggleSearch();openJogador('+j.id+')">'+av(j.av,38)+'<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div><div style="text-align:right">'+stars(j.nota,10)+'<div style="color:var(--muted);font-size:10px;margin-top:2px">'+j.gols+'⚽</div></div></div>';});
   o+=section('Times',times,function(t){return '<div class="ri" onclick="toggleSearch();openTime('+t.id+')"><div style="font-size:30px">'+t.badge+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+t.cidade+' · '+t.vit+'V</div></div>'+pl('Ranking','#4D9EFF')+'</div>';});
   o+=section('Campos',campos,function(c){return '<div class="ri" data-cid="'+c.id+'" onclick="toggleSearch();openCampoFirestore(this.dataset.cid)"><div style="font-size:30px">'+(c.img||'🏟️')+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(c.nome||'Campo')+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+esc(c.bairro||c.end||'')+'</div></div><div style="color:var(--green);font-weight:900;font-size:14px">R$ '+(c.preco||'--')+'</div></div>';});
-  o+=section('Torneios',torns,function(t){return '<div class="ri" onclick="toggleSearch();openTorn('+t.id+')"><div style="font-size:28px">'+t.badge+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+t.data+' · '+t.premio+'</div></div></div>';});
+  o+=section('Torneios',torns,function(t){return '<div class="ri" data-tid="'+t.id+'" onclick="openTorn(this.dataset.tid);toggleSearch()"><div style="font-size:28px">'+t.badge+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+t.data+' · '+t.premio+'</div></div></div>';});
   return o+'</div>';
 }
 function openConfigs(){
@@ -1888,7 +1888,7 @@ function screenInicio(){
   o+='<div class="sr" style="margin-bottom:20px">';
   D.torneios.filter(function(t){return t.status!=='encerrado';}).slice(0,3).forEach(function(t){
     var pct=Math.round(t.inscritos/t.maxTimes*100);
-    o+='<div style="flex-shrink:0;width:185px;background:linear-gradient(135deg,'+t.cor+'15,var(--card));border:1px solid '+t.cor+'30;border-radius:15px;padding:13px;cursor:pointer" onclick="openTorn('+t.id+')">';
+    o+='<div style="flex-shrink:0;width:185px;background:linear-gradient(135deg,'+t.cor+'15,var(--card));border:1px solid '+t.cor+'30;border-radius:15px;padding:13px;cursor:pointer" data-tid="'+t.id+'" onclick="openTorn(this.dataset.tid)">';
     o+='<div style="font-size:28px;margin-bottom:7px">'+t.badge+'</div>';
     o+='<div style="font-weight:800;font-size:13px;margin-bottom:2px">'+esc(t.nome)+'</div>';
     o+='<div style="color:var(--muted);font-size:11px;margin-bottom:2px">'+t.data+' · '+esc(t.campo)+'</div>';
@@ -2455,7 +2455,7 @@ function screenTorneios(){
   if(lista.length===0){o+='<div class="empty"><div style="font-size:40px;margin-bottom:10px">🏆</div><div>Nenhum torneio nesta categoria</div></div>';}
   lista.forEach(function(t){
     var pct=Math.round(t.inscritos/t.maxTimes*100);
-    o+='<div class="torn-card" onclick="openTorn('+t.id+')">';
+    o+='<div class="torn-card" data-tid="'+t.id+'" onclick="openTorn(this.dataset.tid)">';
     o+='<div style="display:flex;align-items:flex-start;gap:12px">';
     o+='<div style="width:48px;height:48px;border-radius:13px;background:'+t.cor+'22;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">'+t.badge+'</div>';
     o+='<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:15px;margin-bottom:3px">'+esc(t.nome)+'</div>';
