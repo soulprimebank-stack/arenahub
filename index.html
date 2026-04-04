@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#07090F" id="theme-meta"/>
-<meta name="description" content="ArenaHub — Futebol amador na palma da mão"/>
-<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;ArenaHub&quot;,&quot;short_name&quot;:&quot;ArenaHub&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%2307090F&quot;,&quot;theme_color&quot;:&quot;%2300F082&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;,&quot;sizes&quot;:&quot;any&quot;}]}"/>
-<title>ArenaHub ⚽</title>
+<meta name="description" content="FutStory — Futebol amador na palma da mão"/>
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;FutStory&quot;,&quot;short_name&quot;:&quot;FutStory&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%2307090F&quot;,&quot;theme_color&quot;:&quot;%2300F082&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;,&quot;sizes&quot;:&quot;any&quot;}]}"/>
+<title>FutStory ⚽</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -242,7 +242,7 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
 <div id="topbar">
   <div class="logo">
     <div class="logo-ic">⚽</div>
-    <div class="logo-tx"><span class="g">Arena</span><span class="o">Hub</span></div>
+    <div class="logo-tx"><span class="g">Fut</span><span class="o">Story</span></div>
   </div>
   <div class="tb-acts">
     <button class="ib" onclick="toggleSearch()" aria-label="Buscar">🔍</button>
@@ -415,7 +415,7 @@ function openConfigs(){
     o+='<div class="tog-knob" style="left:'+(on?'23px':'3px')+'"></div></button></div>';
   });
   o+=dv();
-  o+='<div style="font-size:11px;color:var(--muted);margin-bottom:13px;text-align:center">ArenaHub v6.0 · Todos os direitos reservados</div>';
+  o+='<div style="font-size:11px;color:var(--muted);margin-bottom:13px;text-align:center">FutStory v1.0 · Todos os direitos reservados</div>';
   o+='<button class="btn bs bfw" onclick="closeModal()">Fechar</button>';
   showModal(o);
 }
@@ -1686,8 +1686,8 @@ function screenTornPagamento(t){
     o += '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--teal);margin-bottom:10px">Chave PIX</div>';
     o += '<div style="background:var(--surf);border-radius:10px;padding:14px;margin-bottom:10px">';
     o += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Transferir para</div>';
-    o += '<div style="font-weight:700;font-size:14px;color:var(--text)">arenahub@pix.com.br</div>';
-    o += '<div style="color:var(--muted);font-size:11px;margin-top:3px">ArenaHub Pagamentos LTDA</div></div>';
+    o += '<div style="font-weight:700;font-size:14px;color:var(--text)">futstory@pix.com.br</div>';
+    o += '<div style="color:var(--muted);font-size:11px;margin-top:3px">FutStory Pagamentos LTDA</div></div>';
     o += '<div style="color:var(--green);font-weight:900;font-size:24px;margin-bottom:4px">R$ '+preco+'</div>';
     o += '<div style="color:var(--muted);font-size:12px">Após o pagamento, clique em confirmar</div>';
     o += '</div>';
@@ -1935,7 +1935,7 @@ function screenLogin(){
   var isE=S.loginAba==='entrar';
   var o='<div class="login-wrap fu">';
   o+='<div style="font-size:52px;margin-bottom:10px;filter:drop-shadow(0 0 18px rgba(0,240,130,.4))">⚽</div>';
-  o+='<div style="font-weight:900;font-size:26px;letter-spacing:-.5px;margin-bottom:4px"><span style="color:var(--green)">Arena</span><span style="color:var(--gold)">Hub</span></div>';
+  o+='<div style="font-weight:900;font-size:26px;letter-spacing:-.5px;margin-bottom:4px"><span style="color:var(--green)">Fut</span><span style="color:var(--gold)">Story</span></div>';
   o+='<div style="color:var(--muted);font-size:13px;margin-bottom:32px;text-align:center;line-height:1.5">Futebol amador na palma da mão<br>Goiânia e região</div>';
   o+='<div class="login-card">';
   o+='<div class="login-tabs"><button class="login-tab'+(isE?' a':'')+'" onclick="setLoginAba(\'entrar\')">Entrar</button><button class="login-tab'+(!isE?' a':'')+'" onclick="setLoginAba(\'cadastro\')">Cadastrar</button></div>';
@@ -2973,15 +2973,15 @@ function screenCampoDetalhe(c){
   if(!c.seg) c.seg = 0;
   var disp=D.horarios.filter(function(h){return h.disp;});
   var lista=S.cAbaH==='disp'?disp:D.horarios;
-  var o='<div class="fu" style="padding:14px 14px">'+bb('backLista()');
+  var o='<div class="fu" style="padding:14px 14px;overflow-y:auto">'+bb('backLista()');
   o+='<div class="cgal"><div class="cgal-main">'+c.fotos[S.cFotoIdx]+'</div>';
   o+='<div class="gdots">'+c.fotos.map(function(_,i){return'<div class="gdot" style="'+(S.cFotoIdx===i?'width:22px;background:var(--green)':'width:7px;background:rgba(255,255,255,.4)')+'" onclick="setCFoto('+i+')"></div>';}).join('')+'</div>';
   if(S.cFotoIdx>0)o+='<button class="gnav" style="left:9px" onclick="setCFoto('+(S.cFotoIdx-1)+')">&#8249;</button>';
   if(S.cFotoIdx<c.fotos.length-1)o+='<button class="gnav" style="right:9px" onclick="setCFoto('+(S.cFotoIdx+1)+')">&#8250;</button>';
   if(c.promo&&c.promo.dest)o+='<div style="position:absolute;top:9px;left:9px">'+pl('🔥 '+c.promo.desc,'var(--pink)')+'</div>';
   o+='</div>';
-  o+='<div class="card" style="margin-bottom:13px">';
-  o+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px"><div><div style="font-weight:900;font-size:19px;margin-bottom:2px">'+esc(c.nome)+'</div><div style="color:var(--muted);font-size:12px">📍 '+esc(c.end)+'</div></div>';
+  o+='<div class="card" style="margin-bottom:13px;overflow:visible">';
+  o+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9px"<div><div style="font-weight:900;font-size:19px;margin-bottom:2px">'+esc(c.nome)+'</div><div style="color:var(--muted);font-size:12px">📍 '+esc(c.end)+'</div></div>';
   o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:21px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:11px">por hora</div></div></div>';
   // Social stats row
   var isSeg=S.cSeguindo[c.id]||false;
@@ -3250,7 +3250,7 @@ function screenAdmin(){
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bord);background:var(--bg);position:sticky;top:0;z-index:100">'+
     '<div style="display:flex;align-items:center;gap:9px">'+
     '<button onclick="go(\'social\')" style="width:30px;height:30px;border-radius:9px;background:var(--card);border:1px solid var(--bord);color:var(--text);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center">←</button>'+
-    '<span style="font-weight:900;font-size:16px"><span style="color:var(--green)">Arena</span><span style="color:var(--gold)">Hub</span> <span style="color:var(--muted);font-size:12px;font-weight:400">Admin</span></span></div>'+
+    '<span style="font-weight:900;font-size:16px"><span style="color:var(--green)">Fut</span><span style="color:var(--gold)">Story</span> <span style="color:var(--muted);font-size:12px;font-weight:400">Admin</span></span></div>'+
     pl('Admin','#FFBE00')+'</div>'+
     '<div style="padding:13px 14px 100px">'+
     '<div style="display:flex;gap:5px;margin-bottom:14px">'+
@@ -3357,7 +3357,7 @@ function checkOnboarding() {
   }
 }
 var onboardSteps = [
-  {ic:'⚽', titulo:'Bem-vindo ao ArenaHub!', desc:'Encontre jogos, reserve campos e conecte-se com jogadores da sua região.'},
+  {ic:'⚽', titulo:'Bem-vindo ao FutStory!', desc:'Encontre jogos, reserve campos e conecte-se com jogadores da sua região.'},
   {ic:'🔍', titulo:'Busca inteligente', desc:'Toque na lupa para buscar jogadores, times e campos instantaneamente.'},
   {ic:'🏟️', titulo:'Reserve campos', desc:'Veja horários disponíveis, divida o custo com o time e pague via PIX.'},
   {ic:'🏆', titulo:'Participe de torneios', desc:'Inscreva seu time nos torneios e acompanhe o chaveamento em tempo real.'},
