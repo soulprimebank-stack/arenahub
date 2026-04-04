@@ -2522,7 +2522,14 @@ function screenTornDetalhe(t){
     o+='</div></div>';
   }
   if(t.status==='aberto'&&t.inscritos<t.maxTimes){
-    o+='<button class="btn bp bfw blg" onclick="inscreverTorn()">Inscrever meu time — R$ '+t.preco+'</button>';
+    var jaInscrito = t.inscricoes && S.fbUser && t.inscricoes[S.fbUser.uid];
+    o+='<div style="position:sticky;bottom:72px;margin-top:14px">';
+    if(jaInscrito){
+      o+='<button class="btn bfw blg" style="background:rgba(0,240,130,.15);color:var(--green);border:2px solid var(--green);cursor:default">✅ Você está inscrito!</button>';
+    } else {
+      o+='<button class="btn bp bfw blg" onclick="inscreverTorn()">🏆 Inscrever meu time — R$ '+t.preco+'</button>';
+    }
+    o+='</div>';
   }else if(t.status==='encerrado'){
     o+='<div class="card" style="text-align:center;padding:20px;border-color:rgba(255,190,0,.3);background:rgba(255,190,0,.05)">';
     o+='<div style="font-size:40px;margin-bottom:8px">🥇</div>';
