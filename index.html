@@ -281,7 +281,7 @@ var D={
   campos:[],
   camposFirestore:[],camposModo:'lista',camposCarregando:false,camposBusca:'',camposFiltro:'todos',
   campoLat:null,campoLng:null,campoGeoOk:false,
-  horarios:[],
+  horarios:[],reservaData:'',reservaHora:'',
   feed:[],
   stories:[
     {id:1,user:"Você",av:"🧑",add:true}
@@ -1593,6 +1593,21 @@ function _carregarJogadoresFirestore(){
     }).catch(function(){});
 }
 function setCAbH(a){S.cAbaH=a;render();}
+function _horaFim(h){ var n=parseInt(h)+1; return (n<10?'0':'')+n+':00'; }
+function _onReservaData(val){ S.reservaData=val; S.reservaHora=''; render(); }
+function _abrirPagamentoCampo(){
+  if(!S.cSel){return;}
+  // Montar horSel a partir da data e hora selecionadas
+  var dataFmt = new Date(S.reservaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+  S.horSel = {
+    id: Date.now(),
+    data: dataFmt.charAt(0).toUpperCase() + dataFmt.slice(1),
+    hora: S.reservaHora + ' – ' + _horaFim(S.reservaHora),
+    disp: true
+  };
+  S.cEtapa = 'pagamento';
+  render(); sc();
+}
 function selectHor(id){for(var i=0;i<D.horarios.length;i++){if(D.horarios[i].id===id){S.horSel=D.horarios[i];break;}}render();}
 function setPagMet(m){S.pagMet=m;render();}
 function setPagJog(n){S.pagJog=Math.max(1,Math.min(22,n));render();}
@@ -2993,23 +3008,38 @@ function screenCampoDetalhe(c){
   });
   o+='</div>';
   if(S.cAbaDet==='reservar'){
-    // Horários disponíveis com botão de reserva direto
-    o+='<div style="margin-bottom:13px">';
-    o+='<div style="display:flex;gap:5px;margin-bottom:11px">';
-    o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='disp'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='disp'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='disp'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'disp\')">✅ Disponíveis ('+disp.length+')</button>';
-    o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='todos'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='todos'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='todos'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'todos\')">📋 Todos</button>';
+    var reservaData = S.reservaData || ''; var hoje = new Date(); var minData = hoje.getFullYear()+'-'+String(hoje.getMonth()+1).padStart(2,'0')+'-'+String(hoje.getDate()).padStart(2,'0');
+    var reservaHora = S.reservaHora || '';
+    var horas = ['07:00','08:00','09:00','10:00','11:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
+    // Seleção de data
+    o+='<div style="margin-bottom:14px">';
+    o+='<label style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:8px">📅 Escolha a data</label>';
+    o+='<input id="reserva-data" type="date" value="'+esc(reservaData)+'" min="'+minData+'" onchange="_onReservaData(this.value)" style="width:100%;box-sizing:border-box;padding:12px 14px;border-radius:12px;border:1.5px solid '+(reservaData?'var(--green)':'var(--bord)')+';background:var(--surf);color:var(--text);font-size:14px;outline:none">';
     o+='</div>';
-    if(lista.length===0){
-      o+='<div class="empty"><div style="font-size:36px;margin-bottom:8px">📅</div><div>Nenhum horário disponível no momento</div></div>';
+    // Seleção de horário (só aparece se data selecionada)
+    if(reservaData){
+      o+='<div style="margin-bottom:14px">';
+      o+='<label style="font-size:12px;font-weight:800;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:10px">🕐 Escolha o horário</label>';
+      o+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+      horas.forEach(function(h){
+        var sel = h === reservaHora;
+        o+='<button data-hora="'+h+'" onclick="S.reservaHora=this.dataset.hora;render()" style="padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid '+(sel?'var(--green)':'var(--bord)')+';background:'+(sel?'var(--green)':'var(--surf)')+';color:'+(sel?'var(--bg)':'var(--text2)')+'">'+h+'</button>';
+      });
+      o+='</div>';
+      o+='</div>';
     }
-    lista.forEach(function(h){
-      var sel=S.horSel&&S.horSel.id===h.id;
-      o+='<div class="hor'+(sel?' sel':'')+(h.disp?'':' occ')+'" style="cursor:'+(h.disp?'pointer':'not-allowed')+';"'+(h.disp?' onclick="selectHor('+h.id+')"':'')+'>'+
-        '<div><div style="font-weight:700">'+esc(h.data)+'</div><div style="color:var(--muted);font-size:12px">'+h.hora+'</div></div>'+
-        '<div style="text-align:right"><div style="color:var(--green);font-weight:900;margin-bottom:3px">R$ '+c.preco+'</div>'+pl(h.disp?'Disponível':'Ocupado',h.disp?'#00F082':'#FF4060')+'</div></div>';
-    });
-    o+='</div>';
-    o+='</div>'; // fecha div horarios
+    // Resumo + botão (só aparece se data e horário selecionados)
+    if(reservaData && reservaHora){
+      var dataFmt = new Date(reservaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+      o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.1),var(--surf));border:1.5px solid rgba(0,240,130,.3);border-radius:14px;padding:14px;margin-bottom:6px">';
+      o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">';
+      o+='<div><div style="font-weight:800;font-size:14px;text-transform:capitalize">'+esc(dataFmt)+'</div><div style="color:var(--muted);font-size:13px;margin-top:2px">🕐 '+reservaHora+' – '+_horaFim(reservaHora)+'</div></div>';
+      o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:20px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:11px">por hora</div></div>';
+      o+='</div>';
+      o+='<button class="btn bp bfw" style="padding:13px 0;font-size:15px;font-weight:900" onclick="_abrirPagamentoCampo()">💳 Ir para pagamento</button>';
+      o+='</div>';
+    }
+    o+='</div>'; // fecha reservar
   }else if(S.cAbaDet==='fotos'){
     o+='<div class="ftgrid">'+c.fotos.map(function(f,i){return'<div class="fth'+(S.cFotoIdx===i?' a':'')+'" style="'+(S.cFotoIdx===i?'border-color:'+c.cor:'')+'" onclick="setCFoto('+i+')">'+f+'</div>';}).join('')+'</div>';
     o+='<div style="color:var(--muted);font-size:12px;margin-bottom:5px">Comodidades:</div>';
@@ -3052,17 +3082,7 @@ function screenCampoDetalhe(c){
   }
   o+='</div>';
   o+='</div>';
-  // Botão reserva fixo no fundo — aparece ao selecionar um horário
-  if(S.cAbaDet==='reservar' && S.horSel){
-    o+='<div style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(min(480px,100vw) - 28px);z-index:100;padding:8px 0">';
-    o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.13),var(--card));border:1.5px solid rgba(0,240,130,.35);border-radius:14px;padding:11px 14px;box-shadow:0 4px 24px rgba(0,0,0,.4)">';
-    o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">';
-    o+='<div><div style="font-weight:800;font-size:13px">'+esc(S.horSel.data)+'</div><div style="color:var(--muted);font-size:12px">'+S.horSel.hora+'</div></div>';
-    o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:18px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:10px">por hora</div></div>';
-    o+='</div>';
-    o+='<button class="btn bp bfw" style="padding:12px 0;font-size:14px;font-weight:900" onclick="S.cEtapa=\'pagamento\';render();sc()">💳 Reservar agora</button>';
-    o+='</div></div>';
-  }
+
   return o;
 }
 function screenPagamento(){
