@@ -290,6 +290,7 @@ var D={
   chat:[],
   jogos:[],
   torneios:[],
+  torneiosFirestore:[],tornCarregando:false,
   conquistas:[
     {id:1,ic:"⚽",nome:"Primeiro Gol",  desc:"1º gol marcado",   on:false,cor:"#FFBE00", tipo:"jogador"},
     {id:2,ic:"🎯",nome:"Assistente",    desc:"10 assistências",  on:false,cor:"#4D9EFF", tipo:"jogador"},
@@ -779,6 +780,8 @@ function _initFirebase(){
     // Verificar se há campos no Firestore, senão fazer seed
     _fbDb.collection('campos').limit(1).get().then(function(snap){
       if(snap.empty) _seedCamposGoiania();
+    // Carregar torneios
+    _carregarTorneiosFirestore();
     });
       _iniciarStoriesRealtime();
       _carregarConversasFirestore();
@@ -1599,9 +1602,69 @@ function backCampo(){S.cEtapa='campo';render();sc();}
 
 /* ── TORNEIOS ACTIONS ─────────────────────────────── */
 function setTornAba(a){S.tornAba=a;render();}
-function openTorn(id){for(var i=0;i<D.torneios.length;i++){if(D.torneios[i].id===id){S.tornSel=D.torneios[i];break;}}render();sc();}
+function openTorn(id){
+  var lista = D.torneiosFirestore.length>0 ? D.torneiosFirestore : D.torneios;
+  for(var i=0;i<lista.length;i++){if(lista[i].id===id){S.tornSel=lista[i];break;}}
+  render();sc();
+}
 function backTorn(){S.tornSel=null;S.tornCriar=false;render();sc();}
-function inscreverTorn(){if(S.tornSel&&S.tornSel.inscritos<S.tornSel.maxTimes)S.tornSel.inscritos++;render();toast('Inscrição realizada! 🏆');}
+function inscreverTorn(){
+  if(!S.tornSel||!_fbDb||!S.fbUser){toast('Faça login para se inscrever');return;}
+  if(S.tornSel.inscricoes && S.tornSel.inscricoes[S.fbUser.uid]){toast('Você já está inscrito! ✅');return;}
+  if(S.tornSel.inscritos>=S.tornSel.maxTimes){toast('Torneio lotado!');return;}
+  var ref = _fbDb.collection('torneios').doc(S.tornSel.id);
+  var upd = {inscritos: firebase.firestore.FieldValue.increment(1)};
+  upd['inscricoes.'+S.fbUser.uid] = {nome:S.perfNome||S.fbUser.displayName||'Jogador', uid:S.fbUser.uid, quando:firebase.firestore.FieldValue.serverTimestamp()};
+  ref.update(upd).then(function(){
+    if(!S.tornSel.inscricoes) S.tornSel.inscricoes = {};
+    S.tornSel.inscricoes[S.fbUser.uid] = true;
+    S.tornSel.inscritos = (S.tornSel.inscritos||0)+1;
+    toast('Inscrição realizada! 🏆');
+    render();
+  }).catch(function(e){ toast('Erro: '+e.message); });
+}
+function _carregarTorneiosFirestore(){
+  if(!_fbDb||S.tornCarregando) return;
+  S.tornCarregando = true;
+  _fbDb.collection('torneios').orderBy('criadoEm','desc').get()
+    .then(function(snap){
+      S.tornCarregando = false;
+      D.torneiosFirestore = [];
+      snap.forEach(function(doc){
+        var d = doc.data(); d.id = doc.id;
+        D.torneiosFirestore.push(d);
+      });
+      render();
+    }).catch(function(e){ S.tornCarregando=false; console.log('torneios err:',e); });
+}
+function _criarTorneioFirestore(){
+  if(!_fbDb||!S.fbUser){ toast('Faça login'); return; }
+  var nome = (document.getElementById('torn-nome')||{}).value||'';
+  var modal = (document.getElementById('torn-modal')||{}).value||'Futebol Society';
+  var maxTimes = parseInt((document.getElementById('torn-max')||{}).value||'8');
+  var preco = (document.getElementById('torn-preco')||{}).value||'0';
+  var premio = (document.getElementById('torn-premio')||{}).value||'A definir';
+  var data = (document.getElementById('torn-data')||{}).value||'';
+  var campo = (document.getElementById('torn-campo')||{}).value||'A definir';
+  var descr = (document.getElementById('torn-descr')||{}).value||'';
+  if(!nome.trim()){ toast('Digite o nome do torneio'); return; }
+  if(!data){ toast('Escolha uma data'); return; }
+  var torn = {
+    nome:nome.trim(), esporte:modal, maxTimes:maxTimes,
+    preco:preco, premio:premio, data:data, campo:campo,
+    descricao:descr, status:'aberto', inscritos:0,
+    inscricoes:{}, badge:'🏆', cor:'#00F082',
+    criadoPor:S.fbUser.uid, criadoEm:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  _fbDb.collection('torneios').add(torn).then(function(ref){
+    torn.id = ref.id;
+    D.torneiosFirestore.unshift(torn);
+    S.tornCriar = false;
+    S.tornSel = torn;
+    toast('Torneio criado! 🏆');
+    render();sc();
+  }).catch(function(e){ toast('Erro: '+e.message); });
+}
 
 /* ── MENSAGENS ACTIONS ────────────────────────────── */
 /* ── CHAT FIRESTORE ───────────────────────────────── */
@@ -1870,9 +1933,9 @@ function screenInicio(){
   D.jogadores.slice(0,3).forEach(function(j,i){
     o+='<div class="card" style="display:flex;align-items:center;gap:11px;padding:9px 13px">';
     o+='<span style="font-size:19px;width:26px;text-align:center">'+['🥇','🥈','🥉'][i]+'</span>';
-    o+=av(j.av,36);
-    o+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="color:var(--muted);font-size:11px">'+j.pos+' · '+j.cidade+'</div></div>';
-    o+=stars(j.nota,11)+'</div>';
+    o+=av(j.av||j.foto||'⚽',36);
+    o+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome||j.nomeCompleto||'Jogador')+'</div><div style="color:var(--muted);font-size:11px">'+(j.pos||j.posicao||'–')+' · '+(j.cidade||'Goiânia')+'</div></div>';
+    o+=stars(j.nota||0,11)+'</div>';
   });
   o+='</div></div>';
   return o;
@@ -2054,7 +2117,7 @@ function screenJogadores(){
     o+='<span style="color:'+(i<3?'var(--gold)':'var(--muted)')+';font-weight:900;font-size:14px;width:20px;text-align:center;flex-shrink:0">'+(i<3?['🥇','🥈','🥉'][i]:(i+1)+'º')+'</span>';
     o+=av(j.av,42,i<3?'var(--gold)':'');
     o+='<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div>';
-    o+='<div style="text-align:right;flex-shrink:0">'+stars(j.nota,10)+'<div style="color:var(--muted);font-size:11px;margin-top:3px">'+j.gols+'⚽ '+j.assist+'🎯</div></div></div>';
+    o+='<div style="text-align:right;flex-shrink:0">'+stars(j.nota||0,10)+'<div style="color:var(--muted);font-size:11px;margin-top:3px">'+(j.gols||0)+'⚽ '+(j.assist||0)+'🎯</div></div></div>';
   });
   if(totalJog===0){o+='<div class="empty" style="padding:16px 0">Nenhum jogador encontrado.</div>';}
 
@@ -2372,8 +2435,11 @@ function screenTimeDetalhe(t){
 function screenTorneios(){
   if(S.tornCriar)return screenCriarTorneio();
   if(S.tornSel)return screenTornDetalhe(S.tornSel);
+  // Carregar do Firestore na primeira vez
+  if(!S.tornCarregando && D.torneiosFirestore.length===0){ _carregarTorneiosFirestore(); }
   var ABAS=[{id:'abertos',l:'Abertos'},{id:'andamento',l:'Em andamento'},{id:'encerrado',l:'Encerrados'}];
-  var lista=D.torneios.filter(function(t){
+  var fonte = D.torneiosFirestore.length>0 ? D.torneiosFirestore : D.torneios;
+  var lista=fonte.filter(function(t){
     return S.tornAba==='abertos'?t.status==='aberto':S.tornAba==='andamento'?t.status==='andamento':t.status==='encerrado';
   });
   var SCOR={aberto:'#00F082',andamento:'#FFBE00',encerrado:'#4E6080'};
@@ -2469,18 +2535,21 @@ function screenTornDetalhe(t){
   return o;
 }
 function screenCriarTorneio(){
+  var camposOpts = (D.camposFirestore.length>0?D.camposFirestore:D.campos).map(function(c){
+    return '<option value="'+esc(c.nome||'')+'">'+esc(c.nome||'')+'</option>';
+  }).join('');
+  if(!camposOpts) camposOpts = '<option>A definir</option>';
   var o='<div class="fu" style="padding:14px 14px">'+bb('backTorn()');
   o+='<h3 style="font-weight:900;font-size:19px;margin:0 0 18px">🏆 Criar Torneio</h3>';
-  o+='<div class="fg"><label class="fl">Nome do torneio</label><input class="fi" placeholder="Ex: Copa do Cerrado"></div>';
-  o+='<div class="fg"><label class="fl">Modalidade</label><select class="fi"><option>Futebol Society</option><option>Futebol 7</option><option>Futebol 11</option><option>Futsal</option></select></div>';
-  o+='<div class="fg"><label class="fl">Número de times</label><select class="fi"><option>4</option><option>8</option><option>12</option><option>16</option></select></div>';
-  o+='<div class="fg"><label class="fl">Taxa de inscrição (R$)</label><input class="fi" type="number" placeholder="Ex: 150"></div>';
-  o+='<div class="fg"><label class="fl">Prêmio</label><input class="fi" placeholder="Ex: R$ 2.000"></div>';
-  o+='<div class="fg"><label class="fl">Data</label><input class="fi" type="date"></div>';
-  o+='<div class="fg" style="margin:0"><label class="fl">Campo</label><select class="fi">';
-  D.campos.forEach(function(c){o+='<option>'+esc(c.nome)+'</option>';});
-  o+='</select></div>'+dv();
-  o+='<button class="btn bp bfw" style="padding:12px 0" onclick="backTorn();toast(\'Torneio criado! 🏆\')">Criar Torneio ✓</button></div>';
+  o+='<div class="fg"><label class="fl">Nome do torneio *</label><input id="torn-nome" class="fi" placeholder="Ex: Copa do Cerrado 2026"></div>';
+  o+='<div class="fg"><label class="fl">Modalidade</label><select id="torn-modal" class="fi"><option>Futebol Society</option><option>Futebol 7</option><option>Futebol 11</option><option>Futsal</option></select></div>';
+  o+='<div class="fg"><label class="fl">Número de times</label><select id="torn-max" class="fi"><option value="4">4 times</option><option value="8" selected>8 times</option><option value="12">12 times</option><option value="16">16 times</option></select></div>';
+  o+='<div class="fg"><label class="fl">Taxa de inscrição (R$)</label><input id="torn-preco" class="fi" type="number" placeholder="Ex: 150" min="0"></div>';
+  o+='<div class="fg"><label class="fl">Prêmio</label><input id="torn-premio" class="fi" placeholder="Ex: R$ 2.000 + troféu"></div>';
+  o+='<div class="fg"><label class="fl">Data *</label><input id="torn-data" class="fi" type="date"></div>';
+  o+='<div class="fg"><label class="fl">Campo</label><select id="torn-campo" class="fi">'+camposOpts+'</select></div>';
+  o+='<div class="fg" style="margin-bottom:18px"><label class="fl">Descrição</label><textarea id="torn-descr" class="fi" rows="3" placeholder="Regras, formato, informações..." style="resize:none;height:80px"></textarea></div>';
+  o+='<button class="btn bp bfw blg" onclick="_criarTorneioFirestore()">🏆 Criar Torneio</button></div>';
   return o;
 }
 
