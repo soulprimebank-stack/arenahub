@@ -2534,8 +2534,8 @@ function screenCampos(){
   o += '</div>'; // fim header
 
   if(modo==='mapa'){
-    // Mapa Leaflet
-    o += '<div id="mapa-campos" style="height:340px;width:100%;background:var(--surf);position:relative">';
+    // Mapa Leaflet - inicializar após render
+    o += '<div id="mapa-campos" style="height:340px;width:100%;background:var(--surf);position:relative;z-index:1">';
     if(!S.campoGeoOk){
       o += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:5">';
       o += '<div style="font-size:36px">📍</div>';
@@ -2653,29 +2653,41 @@ function _calcDistKm(lat1,lng1,lat2,lng2){
 
 var _mapaLeaflet = null;
 function _initMapaCampos(){
-  if(typeof L === 'undefined'){
-    // Leaflet ainda não carregou — carregar dinamicamente
-    var sc = document.createElement('script');
-    sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    sc.onload = function(){ _renderMapaCampos(); };
-    document.head.appendChild(sc);
-  } else {
-    _renderMapaCampos();
-  }
+  // Aguardar o DOM renderizar antes de inicializar
+  setTimeout(function(){
+    if(!document.getElementById('mapa-campos')) return;
+    if(typeof L === 'undefined'){
+      if(window._leafletLoading) return;
+      window._leafletLoading = true;
+      var sc = document.createElement('script');
+      sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      sc.onload = function(){ window._leafletLoading = false; _renderMapaCampos(); };
+      document.head.appendChild(sc);
+    } else {
+      _renderMapaCampos();
+    }
+  }, 150);
 }
 
 function _renderMapaCampos(){
   var el = document.getElementById('mapa-campos');
   if(!el) return;
+  el.style.height = '340px';
+  el.style.width = '100%';
   // Destruir mapa anterior se existir
-  if(_mapaLeaflet){ _mapaLeaflet.remove(); _mapaLeaflet=null; }
+  if(_mapaLeaflet){ try{ _mapaLeaflet.off(); _mapaLeaflet.remove(); }catch(e){} _mapaLeaflet=null; }
+  // Limpar qualquer instância Leaflet no container
+  if(el._leaflet_id){ delete el._leaflet_id; }
+  el.innerHTML = '';
   // Centro: localização do usuário ou Goiânia
   var lat = S.campoLat || -16.6869;
   var lng = S.campoLng || -49.2648;
   _mapaLeaflet = L.map('mapa-campos').setView([lat,lng],13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap'
+    attribution:'© OpenStreetMap',maxZoom:18
   }).addTo(_mapaLeaflet);
+  // Corrigir tiles quebrados
+  setTimeout(function(){ if(_mapaLeaflet) _mapaLeaflet.invalidateSize(); }, 200);
   // Pin do usuário
   if(S.campoGeoOk){
     var iconUser = L.divIcon({html:'<div style="width:18px;height:18px;border-radius:50%;background:#4D9EFF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
