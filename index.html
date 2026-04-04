@@ -2534,8 +2534,9 @@ function screenCampos(){
   o += '</div>'; // fim header
 
   if(modo==='mapa'){
-    // Mapa Leaflet - container com dimensões fixas
-    o += '<div id="mapa-campos" style="height:340px;width:100%;min-height:340px;background:#1a1a2e;position:relative;z-index:1;overflow:hidden">';
+    // Mapa Leaflet - placeholder simples, o mapa real é criado pelo JS
+    o += '<div id="mapa-campos-placeholder" style="height:340px;width:100%;background:#0d1117;position:relative;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center"><div style="color:#555;font-size:13px">Carregando mapa...</div></div>';
+    o += '<div id="mapa-campos" style="display:none"></div>';
     if(!S.campoGeoOk){
       o += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:5">';
       o += '<div style="font-size:36px">📍</div>';
@@ -2672,56 +2673,50 @@ function _initMapaCampos(){
 }
 
 function _renderMapaCampos(){
-  var el = document.getElementById('mapa-campos');
-  if(!el) return;
+  var placeholder = document.getElementById('mapa-campos-placeholder');
+  if(!placeholder) return;
   // Destruir mapa anterior se existir
   if(_mapaLeaflet){ try{ _mapaLeaflet.off(); _mapaLeaflet.remove(); }catch(e){} _mapaLeaflet=null; }
+  // Usar o placeholder como container do mapa - limpar e preparar
+  placeholder.innerHTML = '';
+  placeholder.style.height = '340px';
+  placeholder.style.width = '100%';
+  placeholder.style.position = 'relative';
+  placeholder.style.borderRadius = '12px';
+  placeholder.style.overflow = 'hidden';
+  // Usar o placeholder diretamente como container Leaflet
+  var el = placeholder;
   if(el._leaflet_id){ try{ delete el._leaflet_id; }catch(e){} }
-  el.innerHTML = '';
-  // Fix crítico: remover transform/animation do ancestral .fu para que
-  // o Leaflet calcule posições corretas dos tiles
-  var fuPai = el.closest('.fu');
-  if(fuPai){
-    fuPai.style.animation = 'none';
-    fuPai.style.transform = 'translateY(0px)';
-    fuPai.style.opacity = '1';
-  }
-  // Definir dimensões fixas no container
-  el.style.height = '340px';
-  el.style.width = '100%';
-  el.style.position = 'relative';
-  el.style.zIndex = '1';
-  // Forçar reflow para garantir posições corretas
-  void el.offsetHeight;
-  void el.getBoundingClientRect();
-  // Centro: localização do usuário ou Goiânia
-  var lat = S.campoLat || -16.6869;
-  var lng = S.campoLng || -49.2648;
-  _mapaLeaflet = L.map('mapa-campos').setView([lat,lng],13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap',maxZoom:18
-  }).addTo(_mapaLeaflet);
-  // Corrigir tiles quebrados — múltiplos calls para garantir
-  setTimeout(function(){ if(_mapaLeaflet){ _mapaLeaflet.invalidateSize(true); } }, 300);
-  setTimeout(function(){ if(_mapaLeaflet){ _mapaLeaflet.invalidateSize(true); } }, 800);
-  // Pin do usuário
-  if(S.campoGeoOk){
-    var iconUser = L.divIcon({html:'<div style="width:18px;height:18px;border-radius:50%;background:#4D9EFF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
-    L.marker([lat,lng],{icon:iconUser}).addTo(_mapaLeaflet).bindPopup('Você está aqui');
-  }
-  // Pins dos campos
-  var campos = D.camposFirestore.length>0 ? D.camposFirestore : D.campos;
-  campos.forEach(function(c){
-    if(!c.lat||!c.lng) return;
-    var nota = c.nota||0;
-    var iconCampo = L.divIcon({
-      html:'<div style="background:#00F082;border:2px solid #fff;border-radius:10px;padding:4px 7px;font-size:11px;font-weight:800;color:#000;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)">🏟️ '+esc(c.nome||'Campo')+'</div>',
-      className:'',iconAnchor:[0,0]
-    });
-    L.marker([c.lat,c.lng],{icon:iconCampo}).addTo(_mapaLeaflet)
-      .bindPopup('<b>'+esc(c.nome||'Campo')+'</b><br>'+esc(c.bairro||c.end||'')+'<br>R$ '+(c.preco||'--')+'/h<br><button data-cid="'+c.id+'" onclick="openCampoFirestore(this.dataset.cid)" style="margin-top:6px;padding:4px 10px;background:#00F082;border:none;border-radius:6px;font-weight:700;cursor:pointer">Ver detalhes</button>')
-      .openPopup();
-  });
+  // Aguardar 2 frames para garantir que animação CSS terminou
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      // Centro: localização do usuário ou Goiânia
+      var lat = S.campoLat || -16.6869;
+      var lng = S.campoLng || -49.2648;
+      _mapaLeaflet = L.map(el).setView([lat,lng],13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© OpenStreetMap',maxZoom:18
+      }).addTo(_mapaLeaflet);
+      setTimeout(function(){ if(_mapaLeaflet) _mapaLeaflet.invalidateSize(true); }, 200);
+      // Pin do usuário
+      if(S.campoGeoOk){
+        var iconUser = L.divIcon({html:'<div style="width:18px;height:18px;border-radius:50%;background:#4D9EFF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
+        L.marker([lat,lng],{icon:iconUser}).addTo(_mapaLeaflet).bindPopup('Você está aqui');
+      }
+      // Pins dos campos
+      var campos = D.camposFirestore.length>0 ? D.camposFirestore : D.campos;
+      campos.forEach(function(c){
+        if(!c.lat||!c.lng) return;
+        var iconCampo = L.divIcon({
+          html:'<div style="background:#00F082;border:2px solid #fff;border-radius:10px;padding:4px 7px;font-size:11px;font-weight:800;color:#000;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.3)">🏟️ '+esc(c.nome||'Campo')+'</div>',
+          className:'',iconAnchor:[0,0]
+        });
+        L.marker([c.lat,c.lng],{icon:iconCampo}).addTo(_mapaLeaflet)
+          .bindPopup('<b>'+esc(c.nome||'Campo')+'</b><br>'+esc(c.bairro||c.end||'')+'<br>R$ '+(c.preco||'--')+'/h<br><button data-cid="'+c.id+'" onclick="openCampoFirestore(this.dataset.cid)" style="margin-top:6px;padding:4px 10px;background:#00F082;border:none;border-radius:6px;font-weight:700;cursor:pointer">Ver detalhes</button>')
+          .openPopup();
+      });
+    }); // fim rAF2
+  }); // fim rAF1
 }
 
 function openCampoFirestore(id){
