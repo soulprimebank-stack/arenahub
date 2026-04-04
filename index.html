@@ -2766,6 +2766,26 @@ function openCampoFirestore(id){
   S.cEtapa='campo'; S.cFotoIdx=0; S.cAbaDet='fotos'; render(); sc();
 }
 function screenCampoDetalhe(c){
+  // Normalizar campos do Firestore (que não têm fotos/videos/membros etc)
+  if(!c.fotos || !c.fotos.length){
+    c.fotos = ['<div style="width:100%;height:100%;background:linear-gradient(135deg,'+(c.cor||'#1a472a')+','+(c.cor2||'#0f2d1a')+');display:flex;align-items:center;justify-content:center;font-size:60px">'+(c.img||'🏟️')+'</div>'];
+  }
+  if(!c.videos) c.videos = [];
+  if(!c.membros) c.membros = [];
+  if(!c.planos) c.planos = [];
+  if(!c.comod){
+    var comodList = [];
+    if(c.grass) comodList.push('🌱 '+c.grass);
+    if(c.ilum) comodList.push('💡 Iluminado');
+    if(c.vestiario) comodList.push('🚿 Vestiário');
+    if(c.estac) comodList.push('🚗 Estacionamento');
+    c.comod = comodList;
+  }
+  if(!c.avs) c.avs = 0;
+  if(!c.nota) c.nota = 0;
+  if(!c.vagas) c.vagas = '–';
+  if(!c.cor) c.cor = '#00F082';
+  if(!c.seg) c.seg = 0;
   var disp=D.horarios.filter(function(h){return h.disp;});
   var lista=S.cAbaH==='disp'?disp:D.horarios;
   var o='<div class="fu" style="padding:14px 14px">'+bb('backLista()');
