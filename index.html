@@ -290,7 +290,7 @@ var D={
   chat:[],
   jogos:[],
   torneios:[],
-  torneiosFirestore:[],tornCarregando:false,
+  torneiosFirestore:[],tornCarregando:false,tornPagMet:'pix',tornPagEtapa:null,
   conquistas:[
     {id:1,ic:"⚽",nome:"Primeiro Gol",  desc:"1º gol marcado",   on:false,cor:"#FFBE00", tipo:"jogador"},
     {id:2,ic:"🎯",nome:"Assistente",    desc:"10 assistências",  on:false,cor:"#4D9EFF", tipo:"jogador"},
@@ -1612,17 +1612,107 @@ function inscreverTorn(){
   if(!S.tornSel||!_fbDb||!S.fbUser){toast('Faça login para se inscrever');return;}
   if(S.tornSel.inscricoes && S.tornSel.inscricoes[S.fbUser.uid]){toast('Você já está inscrito! ✅');return;}
   if(S.tornSel.inscritos>=S.tornSel.maxTimes){toast('Torneio lotado!');return;}
+  // Abrir tela de pagamento antes de confirmar inscrição
+  S.tornPagEtapa = 'pagamento';
+  S.tornPagMet = 'pix';
+  render(); sc();
+}
+function _confirmarInscricaoTorn(){
+  if(!S.tornSel||!_fbDb||!S.fbUser) return;
   var ref = _fbDb.collection('torneios').doc(S.tornSel.id);
   var upd = {inscritos: firebase.firestore.FieldValue.increment(1)};
-  upd['inscricoes.'+S.fbUser.uid] = {nome:S.perfNome||S.fbUser.displayName||'Jogador', uid:S.fbUser.uid, quando:firebase.firestore.FieldValue.serverTimestamp()};
+  upd['inscricoes.'+S.fbUser.uid] = {
+    nome: S.perfNome||S.fbUser.displayName||'Jogador',
+    uid: S.fbUser.uid,
+    pagMet: S.tornPagMet,
+    quando: firebase.firestore.FieldValue.serverTimestamp()
+  };
   ref.update(upd).then(function(){
     if(!S.tornSel.inscricoes) S.tornSel.inscricoes = {};
     S.tornSel.inscricoes[S.fbUser.uid] = true;
     S.tornSel.inscritos = (S.tornSel.inscritos||0)+1;
-    toast('Inscrição realizada! 🏆');
-    render();
+    S.tornPagEtapa = 'confirmado';
+    render(); sc();
   }).catch(function(e){ toast('Erro: '+e.message); });
 }
+function _setTornPagMet(m){ S.tornPagMet=m; render(); }
+function screenTornPagamento(t){
+  var preco = t.preco || '0';
+  var met = S.tornPagMet || 'pix';
+  var o = '<div class="fu" style="padding:14px">'+bb('S.tornPagEtapa=null;render()');
+  o += '<h3 style="font-weight:900;font-size:19px;margin:0 0 16px">💳 Pagamento da Inscrição</h3>';
+  // Resumo do torneio
+  o += '<div class="card" style="margin-bottom:13px;border-color:rgba(0,240,130,.25);background:rgba(0,240,130,.05)">';
+  o += '<div style="display:flex;align-items:center;gap:11px;margin-bottom:11px">';
+  o += '<div style="font-size:32px">'+t.badge+'</div>';
+  o += '<div><div style="font-weight:800;font-size:15px">'+esc(t.nome)+'</div>';
+  o += '<div style="color:var(--muted);font-size:12px">'+esc(t.esporte||'')+(t.data?' · '+t.data:'')+'</div></div></div>';
+  o += '<div style="width:100%;height:1px;background:var(--bord);margin-bottom:11px"></div>';
+  o += '<div style="display:flex;justify-content:space-between;align-items:center">';
+  o += '<span style="color:var(--text2);font-size:14px">Taxa de inscrição</span>';
+  o += '<span style="color:var(--green);font-weight:900;font-size:22px">R$ '+preco+'</span>';
+  o += '</div></div>';
+  // Forma de pagamento
+  o += '<div class="card" style="margin-bottom:18px">';
+  o += '<div style="font-weight:800;font-size:14px;margin-bottom:13px">Forma de pagamento</div>';
+  [{id:'pix',ic:'💠',l:'PIX',sub:'Instantâneo e sem taxas'},
+   {id:'cartao',ic:'💳',l:'Cartão de crédito',sub:'Débito ou crédito'}].forEach(function(m){
+    var act = met===m.id;
+    o += '<div data-met="'+m.id+'" onclick="_setTornPagMet(this.dataset.met)" style="display:flex;align-items:center;gap:13px;padding:13px;border-radius:12px;border:2px solid '+(act?'var(--green)':'var(--bord)')+';background:'+(act?'rgba(0,240,130,.07)':'var(--surf)')+';margin-bottom:9px;cursor:pointer">';
+    o += '<span style="font-size:28px">'+m.ic+'</span>';
+    o += '<div style="flex:1"><div style="font-weight:700;font-size:14px">'+m.l+'</div><div style="color:var(--muted);font-size:12px">'+m.sub+'</div></div>';
+    if(act) o += '<div style="width:22px;height:22px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:var(--bg);font-weight:900;font-size:13px">✓</div>';
+    o += '</div>';
+  });
+  o += '</div>';
+  // PIX: mostrar chave QR simulado
+  if(met==='pix'){
+    o += '<div class="card" style="margin-bottom:18px;text-align:center;border-color:rgba(0,212,200,.3)">';
+    o += '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--teal);margin-bottom:10px">Chave PIX</div>';
+    o += '<div style="background:var(--surf);border-radius:10px;padding:14px;margin-bottom:10px">';
+    o += '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Transferir para</div>';
+    o += '<div style="font-weight:700;font-size:14px;color:var(--text)">arenahub@pix.com.br</div>';
+    o += '<div style="color:var(--muted);font-size:11px;margin-top:3px">ArenaHub Pagamentos LTDA</div></div>';
+    o += '<div style="color:var(--green);font-weight:900;font-size:24px;margin-bottom:4px">R$ '+preco+'</div>';
+    o += '<div style="color:var(--muted);font-size:12px">Após o pagamento, clique em confirmar</div>';
+    o += '</div>';
+  } else {
+    o += '<div class="card" style="margin-bottom:18px;border-color:rgba(77,158,255,.3)">';
+    o += '<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#4D9EFF;margin-bottom:10px">Dados do cartão</div>';
+    o += '<input class="fi" placeholder="Número do cartão" style="margin-bottom:9px">';
+    o += '<div style="display:flex;gap:9px"><input class="fi" placeholder="Validade MM/AA" style="flex:1"><input class="fi" placeholder="CVV" style="width:80px"></div>';
+    o += '</div>';
+  }
+  o += '<button class="btn bp bfw blg" onclick="_confirmarInscricaoTorn()">✅ Confirmar Pagamento — R$ '+preco+'</button>';
+  o += '</div>';
+  return o;
+}
+
+function screenTornConfirmado(t){
+  var o = '<div class="cnf fu">';
+  o += '<div class="cnf-em">🏆</div>';
+  o += '<div class="cnf-ti">Inscrição Confirmada!</div>';
+  o += '<p style="color:var(--text2);font-size:14px;margin-bottom:22px">Você está inscrito no torneio <strong>'+esc(t.nome)+'</strong></p>';
+  o += '<div class="card" style="margin-bottom:22px;text-align:left">';
+  o += '<div style="font-weight:800;font-size:14px;margin-bottom:11px">Resumo</div>';
+  [
+    {l:'Torneio', v: esc(t.nome)},
+    {l:'Data', v: t.data||'A definir'},
+    {l:'Local', v: esc(t.campo||'A definir')},
+    {l:'Taxa paga', v:'R$ '+(t.preco||'0'), ok:true},
+    {l:'Forma de pgto', v: S.tornPagMet==='pix'?'💠 PIX':'💳 Cartão'}
+  ].forEach(function(r){
+    o += '<div style="display:flex;justify-content:space-between;margin-bottom:9px">';
+    o += '<span style="color:var(--muted);font-size:13px">'+r.l+'</span>';
+    o += '<span style="color:'+(r.ok?'var(--green)':'var(--text)')+';font-weight:'+(r.ok?900:500)+';font-size:13px">'+r.v+'</span>';
+    o += '</div>';
+  });
+  o += '</div>';
+  o += '<button class="btn bp bsm" onclick="S.tornPagEtapa=null;S.tornSel=null;go(\'torneios\');">← Voltar aos torneios</button>';
+  o += '</div>';
+  return o;
+}
+
 function _carregarTorneiosFirestore(){
   if(!_fbDb||S.tornCarregando) return;
   S.tornCarregando = true;
@@ -2483,6 +2573,10 @@ function screenTorneios(){
   return o;
 }
 function screenTornDetalhe(t){
+  // Intercept pagamento etapas
+  if(S.tornPagEtapa==='pagamento') return screenTornPagamento(t);
+  if(S.tornPagEtapa==='confirmado') return screenTornConfirmado(t);
+
   var SCOR={aberto:'#00F082',andamento:'#FFBE00',encerrado:'#4E6080'};
   var SLBL={aberto:'Inscrições abertas',andamento:'Em andamento',encerrado:'Encerrado'};
   var pct=Math.round(t.inscritos/t.maxTimes*100);
