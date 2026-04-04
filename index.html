@@ -1520,7 +1520,7 @@ function setTAba(a){S.tAba=a;render();}
 function sendChat(){var inp=document.getElementById('chat-in');if(!inp||!inp.value.trim())return;S.chatMsgs.push({id:Date.now(),de:'Você',msg:inp.value,hora:'agora',meu:true,av:'🧑'});inp.value='';render();}
 
 /* ── CAMPOS ACTIONS ───────────────────────────────── */
-function openCampo(id){for(var i=0;i<D.campos.length;i++){if(D.campos[i].id===id){S.cSel=D.campos[i];break;}}S.cEtapa='campo';S.cFotoIdx=0;S.cAbaDet='fotos';render();sc();}
+function openCampo(id){for(var i=0;i<D.campos.length;i++){if(D.campos[i].id===id){S.cSel=D.campos[i];break;}}S.cEtapa='campo';S.cFotoIdx=0;S.cAbaDet='reservar';render();sc();}
 function setCFoto(i){S.cFotoIdx=i;render();}
 function setCAbaDet(a){S.cAbaDet=a;render();}
 function toggleSeguirCampo(id){S.cSeguindo[id]=!S.cSeguindo[id];render();toast(S.cSeguindo[id]?'Seguindo campo! 🏟️':'Deixou de seguir');}
@@ -2933,7 +2933,7 @@ function openCampoFirestore(id){
   for(var i=0;i<campos.length;i++){
     if(campos[i].id===id){ S.cSel=campos[i]; break; }
   }
-  S.cEtapa='campo'; S.cFotoIdx=0; S.cAbaDet='fotos'; render(); sc();
+  S.cEtapa='campo'; S.cFotoIdx=0; S.cAbaDet='reservar'; render(); sc();
 }
 function screenCampoDetalhe(c){
   // Normalizar campos do Firestore (que não têm fotos/videos/membros etc)
@@ -2983,12 +2983,41 @@ function screenCampoDetalhe(c){
   o+='<button onclick="toggleSeguirCampo('+c.id+')" style="border-radius:99px;padding:7px 16px;font-size:12px;font-weight:800;border:1.5px solid '+(isSeg?'var(--green)':'var(--bord)')+';background:'+(isSeg?'rgba(0,240,130,.12)':'var(--surf)')+';color:'+(isSeg?'var(--green)':'var(--text2)')+';cursor:pointer">'+(isSeg?'✓ Seguindo':'+ Seguir')+'</button></div>';
   o+='<div style="display:flex;align-items:center;gap:9px;margin-bottom:13px">'+stars(c.nota)+'<span style="color:var(--muted);font-size:12px">('+c.avs+')</span>'+pl(c.vagas+' vagas','#4D9EFF')+(isMem?pl('✓ Mensalista','#00F082'):'')+'</div>';
   o+='<div class="ctabs" style="overflow-x:auto;white-space:nowrap">';
-  [['fotos','📸'],['videos','🎬'],['promos','🔥'],['membros','👥']].forEach(function(a){
+  [['reservar','📅'],['fotos','📸'],['videos','🎬'],['promos','🔥'],['membros','👥']].forEach(function(a){
     var act=S.cAbaDet===a[0];
-    o+='<button class="ctab" style="flex-shrink:0;'+(act?'background:'+c.cor+';color:#000;border-color:'+c.cor:'')+'" onclick="setCAbaDet(\''+a[0]+'\')">'+a[1]+' '+a[0].charAt(0).toUpperCase()+a[0].slice(1)+'</button>';
+    var isRes = a[0]==='reservar';
+    var bg = act ? (isRes ? '#00F082' : c.cor) : 'var(--card)';
+    var fg = act ? '#000' : 'var(--text2)';
+    var bd = act ? (isRes ? '#00F082' : c.cor) : 'var(--bord)';
+    o+='<button class="ctab" style="flex-shrink:0;background:'+bg+';color:'+fg+';border-color:'+bd+'" onclick="setCAbaDet(\''+a[0]+'\')">'+a[1]+' '+a[0].charAt(0).toUpperCase()+a[0].slice(1)+'</button>';
   });
   o+='</div>';
-  if(S.cAbaDet==='fotos'){
+  if(S.cAbaDet==='reservar'){
+    // Horários disponíveis com botão de reserva direto
+    o+='<div style="margin-bottom:13px">';
+    o+='<div style="display:flex;gap:5px;margin-bottom:11px">';
+    o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='disp'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='disp'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='disp'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'disp\')">✅ Disponíveis ('+disp.length+')</button>';
+    o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='todos'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='todos'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='todos'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'todos\')">📋 Todos</button>';
+    o+='</div>';
+    if(lista.length===0){
+      o+='<div class="empty"><div style="font-size:36px;margin-bottom:8px">📅</div><div>Nenhum horário disponível no momento</div></div>';
+    }
+    lista.forEach(function(h){
+      var sel=S.horSel&&S.horSel.id===h.id;
+      o+='<div class="hor'+(sel?' sel':'')+(h.disp?'':' occ')+'" style="cursor:'+(h.disp?'pointer':'not-allowed')+';"'+(h.disp?' onclick="selectHor('+h.id+')"':'')+'>'+
+        '<div><div style="font-weight:700">'+esc(h.data)+'</div><div style="color:var(--muted);font-size:12px">'+h.hora+'</div></div>'+
+        '<div style="text-align:right"><div style="color:var(--green);font-weight:900;margin-bottom:3px">R$ '+c.preco+'</div>'+pl(h.disp?'Disponível':'Ocupado',h.disp?'#00F082':'#FF4060')+'</div></div>';
+    });
+    o+='</div>';
+    if(S.horSel){
+      o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.1),var(--card));border:1px solid rgba(0,240,130,.25);border-radius:14px;padding:14px;margin-bottom:13px">';
+      o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">';
+      o+='<div><div style="font-weight:800;font-size:14px">'+esc(S.horSel.data)+'</div><div style="color:var(--muted);font-size:12px">'+S.horSel.hora+'</div></div>';
+      o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:20px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:11px">por hora</div></div></div>';
+      o+='<button class="btn bp bfw" onclick="S.cEtapa=\'pagamento\';render();sc()">💳 Reservar agora</button>';
+      o+='</div>';
+    }
+  }else if(S.cAbaDet==='fotos'){
     o+='<div class="ftgrid">'+c.fotos.map(function(f,i){return'<div class="fth'+(S.cFotoIdx===i?' a':'')+'" style="'+(S.cFotoIdx===i?'border-color:'+c.cor:'')+'" onclick="setCFoto('+i+')">'+f+'</div>';}).join('')+'</div>';
     o+='<div style="color:var(--muted);font-size:12px;margin-bottom:5px">Comodidades:</div>';
     o+='<div style="display:flex;flex-wrap:wrap;gap:5px">'+c.comod.map(function(x){return pl(x,'#4D9EFF');}).join('')+'</div>';
@@ -3029,17 +3058,6 @@ function screenCampoDetalhe(c){
     if(c.membros.length===0&&!isMem2){o+='<div class="empty">Nenhum membro ainda. Seja o primeiro!</div>';}
   }
   o+='</div>';
-  o+='<div style="display:flex;gap:5px;margin-bottom:11px">';
-  o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='disp'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='disp'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='disp'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'disp\')">✅ Disponíveis ('+disp.length+')</button>';
-  o+='<button style="flex:1;border-radius:9px;padding:7px 0;font-size:12px;font-weight:800;cursor:pointer;border:1px solid '+(S.cAbaH==='todos'?'var(--green)':'var(--bord)')+';background:'+(S.cAbaH==='todos'?'var(--green)':'var(--card)')+';color:'+(S.cAbaH==='todos'?'var(--bg)':'var(--text2)')+'" onclick="setCAbH(\'todos\')">📋 Todos</button>';
-  o+='</div>';
-  lista.forEach(function(h){
-    var sel=S.horSel&&S.horSel.id===h.id;
-    o+='<div class="hor'+(sel?' sel':'')+(h.disp?'':' occ')+'"'+(h.disp?' onclick="selectHor('+h.id+')"':'')+'>'+
-      '<div><div style="font-weight:700">'+esc(h.data)+'</div><div style="color:var(--muted);font-size:12px">'+h.hora+'</div></div>'+
-      '<div style="text-align:right"><div style="color:var(--green);font-weight:900;margin-bottom:3px">R$ '+c.preco+'</div>'+pl(h.disp?'Disponível':'Ocupado',h.disp?'#00F082':'#FF4060')+'</div></div>';
-  });
-  if(S.horSel)o+='<div style="position:sticky;bottom:76px;margin-top:13px"><button class="btn bp bfw blg" onclick="S.cEtapa=\'pagamento\';render()">Reservar '+esc(S.horSel.data)+' às '+S.horSel.hora+' →</button></div>';
   o+='</div>';
   return o;
 }
