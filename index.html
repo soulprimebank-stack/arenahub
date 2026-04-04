@@ -27,7 +27,7 @@ input,textarea,select{color:var(--text);background:var(--surf);}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.fu{animation:fadeUp .25s ease forwards}
+.fu{animation:fadeUp .25s ease forwards} .fu:has(#mapa-campos){animation:none;transform:none}
 .su{animation:slideUp .3s ease forwards}
 #topbar{position:sticky;top:0;z-index:200;background:rgba(7,9,15,.95);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--bord);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;min-height:54px;}
 .logo{display:flex;align-items:center;gap:8px;}.logo-ic{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--green),var(--teal));display:flex;align-items:center;justify-content:center;font-size:16px;}
@@ -2534,8 +2534,8 @@ function screenCampos(){
   o += '</div>'; // fim header
 
   if(modo==='mapa'){
-    // Mapa Leaflet - inicializar após render
-    o += '<div id="mapa-campos" style="height:340px;width:100%;background:var(--surf);position:relative;z-index:1">';
+    // Mapa Leaflet - container com dimensões fixas
+    o += '<div id="mapa-campos" style="height:340px;width:100%;min-height:340px;background:#1a1a2e;position:relative;z-index:1;overflow:hidden">';
     if(!S.campoGeoOk){
       o += '<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;z-index:5">';
       o += '<div style="font-size:36px">📍</div>';
@@ -2653,9 +2653,11 @@ function _calcDistKm(lat1,lng1,lat2,lng2){
 
 var _mapaLeaflet = null;
 function _initMapaCampos(){
-  // Aguardar o DOM renderizar antes de inicializar
-  setTimeout(function(){
-    if(!document.getElementById('mapa-campos')) return;
+  // Aguardar o DOM renderizar e estabilizar
+  clearTimeout(window._mapaInitTimer);
+  window._mapaInitTimer = setTimeout(function(){
+    var el = document.getElementById('mapa-campos');
+    if(!el || el.offsetWidth === 0) return;
     if(typeof L === 'undefined'){
       if(window._leafletLoading) return;
       window._leafletLoading = true;
@@ -2666,19 +2668,32 @@ function _initMapaCampos(){
     } else {
       _renderMapaCampos();
     }
-  }, 150);
+  }, 400);
 }
 
 function _renderMapaCampos(){
   var el = document.getElementById('mapa-campos');
   if(!el) return;
-  el.style.height = '340px';
-  el.style.width = '100%';
   // Destruir mapa anterior se existir
   if(_mapaLeaflet){ try{ _mapaLeaflet.off(); _mapaLeaflet.remove(); }catch(e){} _mapaLeaflet=null; }
-  // Limpar qualquer instância Leaflet no container
-  if(el._leaflet_id){ delete el._leaflet_id; }
+  if(el._leaflet_id){ try{ delete el._leaflet_id; }catch(e){} }
   el.innerHTML = '';
+  // Fix crítico: remover transform/animation do ancestral .fu para que
+  // o Leaflet calcule posições corretas dos tiles
+  var fuPai = el.closest('.fu');
+  if(fuPai){
+    fuPai.style.animation = 'none';
+    fuPai.style.transform = 'translateY(0px)';
+    fuPai.style.opacity = '1';
+  }
+  // Definir dimensões fixas no container
+  el.style.height = '340px';
+  el.style.width = '100%';
+  el.style.position = 'relative';
+  el.style.zIndex = '1';
+  // Forçar reflow para garantir posições corretas
+  void el.offsetHeight;
+  void el.getBoundingClientRect();
   // Centro: localização do usuário ou Goiânia
   var lat = S.campoLat || -16.6869;
   var lng = S.campoLng || -49.2648;
@@ -2686,8 +2701,9 @@ function _renderMapaCampos(){
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     attribution:'© OpenStreetMap',maxZoom:18
   }).addTo(_mapaLeaflet);
-  // Corrigir tiles quebrados
-  setTimeout(function(){ if(_mapaLeaflet) _mapaLeaflet.invalidateSize(); }, 200);
+  // Corrigir tiles quebrados — múltiplos calls para garantir
+  setTimeout(function(){ if(_mapaLeaflet){ _mapaLeaflet.invalidateSize(true); } }, 300);
+  setTimeout(function(){ if(_mapaLeaflet){ _mapaLeaflet.invalidateSize(true); } }, 800);
   // Pin do usuário
   if(S.campoGeoOk){
     var iconUser = L.divIcon({html:'<div style="width:18px;height:18px;border-radius:50%;background:#4D9EFF;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)"></div>',iconSize:[18,18],iconAnchor:[9,9],className:''});
