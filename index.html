@@ -3028,17 +3028,6 @@ function screenCampoDetalhe(c){
       o+='</div>';
       o+='</div>';
     }
-    // Resumo + botão (só aparece se data e horário selecionados)
-    if(reservaData && reservaHora){
-      var dataFmt = new Date(reservaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-      o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.1),var(--surf));border:1.5px solid rgba(0,240,130,.3);border-radius:14px;padding:14px;margin-bottom:6px">';
-      o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:11px">';
-      o+='<div><div style="font-weight:800;font-size:14px;text-transform:capitalize">'+esc(dataFmt)+'</div><div style="color:var(--muted);font-size:13px;margin-top:2px">🕐 '+reservaHora+' – '+_horaFim(reservaHora)+'</div></div>';
-      o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:20px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:11px">por hora</div></div>';
-      o+='</div>';
-      o+='<button class="btn bp bfw" style="padding:13px 0;font-size:15px;font-weight:900" onclick="_abrirPagamentoCampo()">💳 Ir para pagamento</button>';
-      o+='</div>';
-    }
     o+='</div>'; // fecha reservar
   }else if(S.cAbaDet==='fotos'){
     o+='<div class="ftgrid">'+c.fotos.map(function(f,i){return'<div class="fth'+(S.cFotoIdx===i?' a':'')+'" style="'+(S.cFotoIdx===i?'border-color:'+c.cor:'')+'" onclick="setCFoto('+i+')">'+f+'</div>';}).join('')+'</div>';
@@ -3083,6 +3072,19 @@ function screenCampoDetalhe(c){
   o+='</div>';
   o+='</div>';
 
+  // Resumo + botão FORA do card — sem overflow
+  if(S.cAbaDet==='reservar' && S.reservaData && S.reservaHora){
+    var dataFmt2 = new Date(S.reservaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+    o+='<div style="margin:14px 0 8px;background:linear-gradient(135deg,rgba(0,240,130,.1),var(--surf));border:1.5px solid rgba(0,240,130,.35);border-radius:14px;padding:14px">';
+    o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+    o+='<div><div style="font-weight:800;font-size:14px;text-transform:capitalize">'+esc(dataFmt2)+'</div>';
+    o+='<div style="color:var(--muted);font-size:13px;margin-top:2px">🕐 '+S.reservaHora+' – '+_horaFim(S.reservaHora)+'</div></div>';
+    o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:20px">R$ '+S.cSel.preco+'</div>';
+    o+='<div style="color:var(--muted);font-size:11px">por hora</div></div>';
+    o+='</div>';
+    o+='<button class="btn bp bfw" style="padding:13px 0;font-size:15px;font-weight:900" onclick="_abrirPagamentoCampo()">💳 Ir para pagamento</button>';
+    o+='</div>';
+  }
   o+='<div style="height:80px"></div>';
   return o;
 }
