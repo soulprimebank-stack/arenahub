@@ -3009,15 +3009,7 @@ function screenCampoDetalhe(c){
         '<div style="text-align:right"><div style="color:var(--green);font-weight:900;margin-bottom:3px">R$ '+c.preco+'</div>'+pl(h.disp?'Disponível':'Ocupado',h.disp?'#00F082':'#FF4060')+'</div></div>';
     });
     o+='</div>';
-    if(S.horSel){
-      o+='<div style="position:sticky;bottom:72px;z-index:50;padding:10px 0 2px;background:linear-gradient(to top,var(--bg) 80%,transparent)">';
-      o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.12),var(--card));border:1px solid rgba(0,240,130,.3);border-radius:14px;padding:13px 14px">';
-      o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-      o+='<div><div style="font-weight:800;font-size:13px">'+esc(S.horSel.data)+'</div><div style="color:var(--muted);font-size:12px">'+S.horSel.hora+'</div></div>';
-      o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:19px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:10px">por hora</div></div></div>';
-      o+='<button class="btn bp bfw" style="padding:13px 0;font-size:15px" onclick="S.cEtapa=\'pagamento\';render();sc()">💳 Reservar agora</button>';
-      o+='</div></div>';
-    }
+    o+='</div>'; // fecha div horarios
   }else if(S.cAbaDet==='fotos'){
     o+='<div class="ftgrid">'+c.fotos.map(function(f,i){return'<div class="fth'+(S.cFotoIdx===i?' a':'')+'" style="'+(S.cFotoIdx===i?'border-color:'+c.cor:'')+'" onclick="setCFoto('+i+')">'+f+'</div>';}).join('')+'</div>';
     o+='<div style="color:var(--muted);font-size:12px;margin-bottom:5px">Comodidades:</div>';
@@ -3060,6 +3052,17 @@ function screenCampoDetalhe(c){
   }
   o+='</div>';
   o+='</div>';
+  // Botão reserva fixo no fundo — aparece ao selecionar um horário
+  if(S.cAbaDet==='reservar' && S.horSel){
+    o+='<div style="position:fixed;bottom:72px;left:50%;transform:translateX(-50%);width:calc(min(480px,100vw) - 28px);z-index:100;padding:8px 0">';
+    o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.13),var(--card));border:1.5px solid rgba(0,240,130,.35);border-radius:14px;padding:11px 14px;box-shadow:0 4px 24px rgba(0,0,0,.4)">';
+    o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">';
+    o+='<div><div style="font-weight:800;font-size:13px">'+esc(S.horSel.data)+'</div><div style="color:var(--muted);font-size:12px">'+S.horSel.hora+'</div></div>';
+    o+='<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:18px">R$ '+c.preco+'</div><div style="color:var(--muted);font-size:10px">por hora</div></div>';
+    o+='</div>';
+    o+='<button class="btn bp bfw" style="padding:12px 0;font-size:14px;font-weight:900" onclick="S.cEtapa=\'pagamento\';render();sc()">💳 Reservar agora</button>';
+    o+='</div></div>';
+  }
   return o;
 }
 function screenPagamento(){
