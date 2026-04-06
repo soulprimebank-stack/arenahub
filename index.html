@@ -277,7 +277,7 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
 /* ── DATA ─────────────────────────────────────────── */
 var D={
   jogadores:[],
-  times:[],
+  times:[],timesFirestore:[],timesCarregando:false,
   campos:[],
   camposFirestore:[],camposModo:'lista',camposCarregando:false,camposBusca:'',camposFiltro:'todos',
   campoLat:null,campoLng:null,campoGeoOk:false,
@@ -348,7 +348,7 @@ function toast(msg){var t=document.getElementById('toast');if(!t)return;t.textCo
 /* ── NAVIGATION ───────────────────────────────────── */
 function go(id){
   S.scr=id;S.admin=false;
-  S.jSel=null;S.jCriar=false;S.tSel=null;S.tCriar=false;
+  S.jSel=null;S.jCriar=false;S.tSel=null;S.tCriar=false;S.timePagMet='pix';S.timeMeuTime=null;
   S.cSel=null;S.cEtapa='lista';S.cCadastr=false;
   S.tornSel=null;S.tornCriar=false;S.msgSel=null;
   render();sc();
@@ -389,7 +389,8 @@ function toggleSearch(){
 function screenBusca(){
   var q=S.busca.toLowerCase();
   var jogs=D.jogadores.filter(function(j){return j.nome.toLowerCase().indexOf(q)>=0;});
-  var times=D.times.filter(function(t){return t.nome.toLowerCase().indexOf(q)>=0;});
+  var tFonte=D.timesFirestore.length>0?D.timesFirestore:D.times;
+var times=tFonte.filter(function(t){return t.nome.toLowerCase().indexOf(q)>=0;});
   var _todosCampos=(D.camposFirestore.length>0?D.camposFirestore:D.campos);
   var campos=_todosCampos.filter(function(c){return (c.nome||'').toLowerCase().indexOf(q)>=0;});
   var torns=D.torneios.filter(function(t){return t.nome.toLowerCase().indexOf(q)>=0;});
@@ -780,8 +781,9 @@ function _initFirebase(){
     // Verificar se há campos no Firestore, senão fazer seed
     _fbDb.collection('campos').limit(1).get().then(function(snap){
       if(snap.empty) _seedCamposGoiania();
-    // Carregar torneios
+    // Carregar torneios e times
     _carregarTorneiosFirestore();
+    _carregarTimesFirestore();
     });
       _iniciarStoriesRealtime();
       _carregarConversasFirestore();
@@ -1515,8 +1517,75 @@ function backJ(){S.jSel=null;S.jCriar=false;render();sc();}
 function setJES(n){S.jES=n;render();}
 
 /* ── TIMES ACTIONS ────────────────────────────────── */
-function openTime(id){for(var i=0;i<D.times.length;i++){if(D.times[i].id===id){S.tSel=D.times[i];break;}}S.tAba='info';S.chatMsgs=D.chat.slice();render();sc();}
+function openTime(id){
+  var lista = D.timesFirestore.length>0 ? D.timesFirestore : D.times;
+  for(var i=0;i<lista.length;i++){if(String(lista[i].id)===String(id)){S.tSel=lista[i];break;}}
+  S.tAba='info';render();sc();
+}
 function setTAba(a){S.tAba=a;render();}
+function _carregarTimesFirestore(){
+  if(!_fbDb||S.timesCarregando) return;
+  S.timesCarregando=true;
+  _fbDb.collection('times').orderBy('criadoEm','desc').get()
+    .then(function(snap){
+      S.timesCarregando=false;
+      D.timesFirestore=[];
+      snap.forEach(function(doc){var d=doc.data();d.id=doc.id;D.timesFirestore.push(d);});
+      // Detectar time do usuário
+      if(S.fbUser){
+        D.timesFirestore.forEach(function(t){
+          if(t.membros && t.membros[S.fbUser.uid]) S.timeMeuTime=t.id;
+        });
+      }
+      render();
+    }).catch(function(e){S.timesCarregando=false;console.log('times err:',e);});
+}
+function _criarTimeFirestore(){
+  if(!_fbDb||!S.fbUser){toast('Faça login');return;}
+  var nome=(document.getElementById('time-nome')||{}).value||'';
+  var cidade=(document.getElementById('time-cidade')||{}).value||'Goiânia';
+  var form=(document.getElementById('time-form')||{}).value||'4-3-3';
+  var badge=(S._timeBadge||'⚽');
+  if(!nome.trim()){toast('Digite o nome do time');return;}
+  // Verificar se já tem time
+  if(S.timeMeuTime){toast('Você já é capitão de um time!');return;}
+  var cor=['#00F082','#4D9EFF','#FF7043','#FFBE00','#B06EFF','#FF4D8D'][Math.floor(Math.random()*6)];
+  var time={
+    nome:nome.trim(),cidade:cidade.trim(),formacao:form,badge:badge,cor:cor,
+    capitao:S.fbUser.uid,capitaoNome:S.perfNome||S.fbUser.displayName||'Capitão',
+    membros:{},vit:0,emp:0,der:0,gols:0,gc:0,
+    criadoEm:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  time.membros[S.fbUser.uid]={nome:S.perfNome||S.fbUser.displayName||'Capitão',cargo:'Capitão',quando:firebase.firestore.FieldValue.serverTimestamp()};
+  _fbDb.collection('times').add(time).then(function(ref){
+    time.id=ref.id;
+    D.timesFirestore.unshift(time);
+    S.timeMeuTime=ref.id;
+    S.tCriar=false;
+    S.tSel=time;
+    toast('Time criado! 🦁');
+    render();sc();
+  }).catch(function(e){toast('Erro: '+e.message);});
+}
+function _entrarNoTime(timeId){
+  if(!_fbDb||!S.fbUser){toast('Faça login');return;}
+  if(S.timeMeuTime){toast('Você já faz parte de um time!');return;}
+  var upd={};
+  upd['membros.'+S.fbUser.uid]={nome:S.perfNome||S.fbUser.displayName||'Jogador',cargo:'Jogador',quando:firebase.firestore.FieldValue.serverTimestamp()};
+  _fbDb.collection('times').doc(timeId).update(upd).then(function(){
+    S.timeMeuTime=timeId;
+    // Atualizar local
+    for(var i=0;i<D.timesFirestore.length;i++){
+      if(D.timesFirestore[i].id===timeId){
+        if(!D.timesFirestore[i].membros) D.timesFirestore[i].membros={};
+        D.timesFirestore[i].membros[S.fbUser.uid]={nome:S.perfNome||S.fbUser.displayName||'Jogador',cargo:'Jogador'};
+        break;
+      }
+    }
+    toast('Entrou no time! 🦁');
+    render();
+  }).catch(function(e){toast('Erro: '+e.message);});
+}
 function sendChat(){var inp=document.getElementById('chat-in');if(!inp||!inp.value.trim())return;S.chatMsgs.push({id:Date.now(),de:'Você',msg:inp.value,hora:'agora',meu:true,av:'🧑'});inp.value='';render();}
 
 /* ── CAMPOS ACTIONS ───────────────────────────────── */
@@ -2445,38 +2514,78 @@ function screenJuizDetalhe(j) {
 
 /* ── TIMES ──────────────────────────────────────── */
 function screenTimes(){
-  if(S.tCriar)return screenCriarTime();
-  if(S.tSel)return screenTimeDetalhe(S.tSel);
+  if(S.tCriar) return screenCriarTime();
+  if(S.tSel) return screenTimeDetalhe(S.tSel);
+  if(!S.timesCarregando && D.timesFirestore.length===0) _carregarTimesFirestore();
+  var fonte = D.timesFirestore.length>0 ? D.timesFirestore : D.times;
   var o='<div class="fu" style="padding:0 14px">';
-  o+='<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px"><span class="stl">Times da Região</span><button class="btn bp bsm" onclick="S.tCriar=true;render()">+ Criar Time</button></div>';
-  D.times.forEach(function(t,i){
-    var pts=t.vit*3+t.emp;
-    var aprov=Math.round(t.vit/(t.vit+t.emp+t.der)*100);
-    o+='<div class="ri tap" onclick="openTime('+t.id+')">';
-    o+='<span style="color:'+(i<3?'var(--gold)':'var(--muted)')+';font-weight:900;font-size:14px;width:20px;text-align:center;flex-shrink:0">'+(i<3?['🥇','🥈','🥉'][i]:(i+1)+'º')+'</span>';
-    o+='<div style="font-size:36px">'+t.badge+'</div>';
-    o+='<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div>';
-    o+='<div style="color:var(--muted);font-size:11px;margin:1px 0 4px">'+t.mem+' jogadores · '+esc(t.cidade)+'</div>';
-    o+='<div class="pbar"><div class="pfil" style="width:'+aprov+'%;background:'+t.cor+'"></div></div></div>';
-    o+='<div style="text-align:right;flex-shrink:0"><div style="color:'+t.cor+';font-weight:900;font-size:19px">'+pts+'</div><div style="color:var(--muted);font-size:10px">pts</div><div style="color:var(--muted);font-size:11px;margin-top:3px">'+t.vit+'V '+t.emp+'E '+t.der+'D</div></div></div>';
-  });
+  o+='<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 12px">';
+  o+='<span class="stl">👥 Times</span>';
+  o+='<button class="btn bp bsm" onclick="S.tCriar=true;render()">+ Criar Time</button>';
   o+='</div>';
+  if(S.timeMeuTime){
+    var meuTime=null;
+    fonte.forEach(function(t){ if(t.id===S.timeMeuTime) meuTime=t; });
+    if(meuTime){
+      o+='<div style="background:linear-gradient(135deg,rgba(0,240,130,.1),var(--card));border:1.5px solid rgba(0,240,130,.3);border-radius:14px;padding:14px;margin-bottom:14px;cursor:pointer" data-tid="'+meuTime.id+'" onclick="openTime(this.dataset.tid)">';
+      o+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--green);letter-spacing:.5px;margin-bottom:8px">⚽ Meu time</div>';
+      o+='<div style="display:flex;align-items:center;gap:12px">';
+      o+='<div style="font-size:40px">'+meuTime.badge+'</div>';
+      o+='<div><div style="font-weight:900;font-size:16px">'+esc(meuTime.nome)+'</div>';
+      o+='<div style="color:var(--muted);font-size:12px">'+Object.keys(meuTime.membros||{}).length+' membros · '+esc(meuTime.cidade||'Goiânia')+'</div></div>';
+      o+='<div style="margin-left:auto;text-align:right"><div style="color:var(--green);font-weight:900;font-size:18px">'+(meuTime.vit||0)*3+(meuTime.emp||0)+'pts</div></div>';
+      o+='</div></div>';
+    }
+  }
+  if(fonte.length===0){
+    o+='<div class="empty"><div style="font-size:40px;margin-bottom:10px">👥</div>';
+    o+='<div style="font-weight:700;margin-bottom:6px">Nenhum time ainda</div>';
+    o+='<div style="color:var(--muted);font-size:13px;margin-bottom:16px">Crie o primeiro time da região!</div>';
+    o+='<button class="btn bp bsm" onclick="S.tCriar=true;render()">🦁 Criar Time</button></div>';
+  } else {
+    fonte.forEach(function(t,i){
+      var nMem = Object.keys(t.membros||{}).length;
+      var pts = (t.vit||0)*3+(t.emp||0);
+      var isMeu = t.id===S.timeMeuTime;
+      o+='<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:9px;cursor:pointer;border-color:'+(isMeu?'var(--green)':'var(--bord)')+';" data-tid="'+t.id+'" onclick="openTime(this.dataset.tid)">';
+      o+='<div style="font-size:36px;width:50px;text-align:center">'+t.badge+'</div>';
+      o+='<div style="flex:1;min-width:0">';
+      o+='<div style="font-weight:800;font-size:14px">'+esc(t.nome)+(isMeu?'<span style="color:var(--green);font-size:11px;margin-left:6px">Meu time</span>':'')+'</div>';
+      o+='<div style="color:var(--muted);font-size:12px;margin-top:2px">'+nMem+' membros · '+esc(t.cidade||'Goiânia')+'</div>';
+      o+='<div style="display:flex;gap:5px;margin-top:5px">'+(t.formacao?pl(t.formacao,'#B06EFF'):'')+'</div>';
+      o+='</div>';
+      o+='<div style="text-align:right;flex-shrink:0"><div style="color:'+(t.cor||'var(--green)')+';font-weight:900;font-size:18px">'+pts+'</div><div style="color:var(--muted);font-size:10px">pts</div></div>';
+      o+='</div>';
+    });
+  }
+  o+='<div style="height:20px"></div></div>';
   return o;
 }
 function screenCriarTime(){
-  var o='<div class="fu" style="padding:14px 14px">'+bb('S.tCriar=false;render()');
+  var badge = S._timeBadge || '⚽';
+  var badges = ['🦁','🦅','🐺','⚡','🐆','🔥','💎','🏆','⚔️','🛡️','🌪️','🦊','🐊','🦂','🦈','⚽'];
+  var o='<div class="fu" style="padding:14px 14px">'+bb('S.tCriar=false;S._timeBadge=null;render()');
   o+='<h3 style="font-weight:900;font-size:19px;margin:0 0 18px">🦁 Criar Novo Time</h3>';
-  o+='<div class="fg"><label class="fl">Nome do time</label><input class="fi" placeholder="Ex: Leões do Cerrado"></div>';
-  o+='<div class="fg"><label class="fl">Cidade</label><input class="fi" placeholder="Ex: Goiânia"></div>';
-  o+='<div class="fg"><label class="fl">Formação tática</label><select class="fi">'+['4-4-2','4-3-3','3-5-2','4-2-3-1','5-3-2'].map(function(f){return'<option>'+f+'</option>';}).join('')+'</select></div>';
-  o+='<div class="card" style="margin-bottom:13px"><div class="fl" style="margin-bottom:11px">Escudo do time</div><div style="display:flex;gap:9px;flex-wrap:wrap">';
-  ['🦁','🦅','🐺','⚡','🐆','🔥','💎','🏆','⚔️','🛡️','🌪️','🦊'].forEach(function(e){o+='<button style="width:46px;height:46px;border-radius:11px;background:var(--surf);border:2px solid var(--bord);font-size:24px;cursor:pointer">'+e+'</button>';});
-  o+='</div></div><button class="btn bp bfw" style="padding:12px 0" onclick="S.tCriar=false;render();toast(\'Time criado! 🦁\')">Criar Time ✓</button></div>';
+  o+='<div class="fg"><label class="fl">Nome do time *</label><input id="time-nome" class="fi" placeholder="Ex: Leões do Cerrado"></div>';
+  o+='<div class="fg"><label class="fl">Cidade</label><input id="time-cidade" class="fi" value="Goiânia" placeholder="Ex: Goiânia"></div>';
+  o+='<div class="fg"><label class="fl">Formação tática</label><select id="time-form" class="fi">'+['4-4-2','4-3-3','3-5-2','4-2-3-1','5-3-2'].map(function(f){return'<option>'+f+'</option>';}).join('')+'</select></div>';
+  o+='<div class="card" style="margin-bottom:18px"><div class="fl" style="margin-bottom:11px">Escudo do time</div>';
+  o+='<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  badges.forEach(function(e){
+    var sel = e===badge;
+    o+='<button data-badge="'+e+'" onclick="S._timeBadge=this.dataset.badge;render()" style="width:46px;height:46px;border-radius:11px;background:'+(sel?'rgba(0,240,130,.2)':'var(--surf)')+';border:2px solid '+(sel?'var(--green)':'var(--bord)')+';font-size:24px;cursor:pointer">'+e+'</button>';
+  });
+  o+='</div></div>';
+  o+='<button class="btn bp bfw blg" onclick="_criarTimeFirestore()">🦁 Criar Time</button>';
+  o+='</div>';
   return o;
 }
 function screenTimeDetalhe(t){
-  if(!S.chatMsgs)S.chatMsgs=D.chat.slice();
-  var pts=t.vit*3+t.emp,saldo=t.gols-t.gc;
+  var membros = t.membros || {};
+  var nMem = Object.keys(membros).length;
+  var pts=(t.vit||0)*3+(t.emp||0), saldo=(t.gols||0)-(t.gc||0);
+  var souMembro = S.fbUser && membros[S.fbUser.uid];
+  var souCapitao = S.fbUser && t.capitao===S.fbUser.uid;
   var o='<div class="fu" style="padding:14px 14px">'+bb('S.tSel=null;S.regJogo=false;render()');
   o+='<div class="thero" style="background:linear-gradient(135deg,'+t.cor+'15,var(--card));border:1px solid '+t.cor+'33">';
   o+='<div style="font-size:62px;margin-bottom:7px;filter:drop-shadow(0 4px 14px '+t.cor+'44)">'+t.badge+'</div>';
@@ -2497,13 +2606,34 @@ function screenTimeDetalhe(t){
     o+='<div class="scard"><div style="color:'+t.cor+';font-weight:900;font-size:23px">'+pts+'</div><div class="slbl">Pontos</div></div>';
     o+='<div class="scard"><div style="color:#FFBE00;font-weight:900;font-size:23px">'+t.gols+'</div><div class="slbl">Gols pró</div></div>';
     o+='<div class="scard"><div style="color:'+(saldo>=0?'#00F082':'#FF4060')+';font-weight:900;font-size:23px">'+(saldo>0?'+':'')+saldo+'</div><div class="slbl">Saldo</div></div></div>';
-    o+='<div style="display:flex;gap:9px"><button class="btn bp" style="flex:1">➕ Entrar no Time</button><button class="btn bs" style="flex:1" onclick="setTAba(\'chat\')">💬 Chat</button></div>';
+    o+='<div style="display:flex;gap:9px">';
+    if(souCapitao){
+      o+='<button class="btn bp" style="flex:1;background:rgba(0,240,130,.1);color:var(--green);border-color:var(--green)">👑 Capitão</button>';
+    } else if(souMembro){
+      o+='<button class="btn bs" style="flex:1">✅ Membro</button>';
+    } else {
+      o+='<button class="btn bp" style="flex:1" data-tid="'+t.id+'" onclick="_entrarNoTime(this.dataset.tid)">➕ Entrar no Time</button>';
+    }
+    o+='<button class="btn bs" style="flex:1" onclick="setTAba(\'chat\')">💬 Chat</button>';
+    o+='</div>';
   }else if(S.tAba==='elenco'){
     o+='<div style="display:flex;flex-direction:column;gap:7px">';
-    D.jogadores.slice(0,6).forEach(function(j){
-      o+='<div class="card" style="display:flex;align-items:center;gap:11px;padding:9px 13px">'+av(j.av,34)+'<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div>'+stars(j.nota,10)+'</div>'+pl(j.pos,'#00F082')+'</div>';
-    });
-    o+='<button class="btn bs" style="margin-top:3px">+ Abrir vaga</button></div>';
+    var memList = Object.keys(membros);
+    if(memList.length===0){
+      o+='<div class="empty">Nenhum membro ainda.</div>';
+    } else {
+      memList.forEach(function(uid){
+        var m = membros[uid];
+        var isCapt = uid===t.capitao;
+        o+='<div class="card" style="display:flex;align-items:center;gap:11px;padding:10px 13px">';
+        o+=av(null,34,isCapt?'var(--gold)':'var(--green)');
+        o+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(m.nome||'Jogador')+'</div>';
+        o+='<div style="color:var(--muted);font-size:11px;margin-top:2px">'+(isCapt?'👑 Capitão':(m.cargo||'Jogador'))+'</div></div>';
+        o+='</div>';
+      });
+    }
+    if(souCapitao) o+='<button class="btn bs" style="margin-top:5px">+ Convidar jogador</button>';
+    o+='</div>';
   }else if(S.tAba==='jogos'){
     var tjogos=D.jogos.filter(function(j){return j.t1===t.nome||j.t2===t.nome;});
     if(S.regJogo){
