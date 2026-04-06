@@ -2590,7 +2590,7 @@ function screenTimeDetalhe(t){
   o+='<div class="thero" style="background:linear-gradient(135deg,'+t.cor+'15,var(--card));border:1px solid '+t.cor+'33">';
   o+='<div style="font-size:62px;margin-bottom:7px;filter:drop-shadow(0 4px 14px '+t.cor+'44)">'+t.badge+'</div>';
   o+='<div style="font-weight:900;font-size:21px;margin-bottom:7px">'+esc(t.nome)+'</div>';
-  o+='<div style="display:flex;justify-content:center;gap:7px;flex-wrap:wrap">'+pl(t.cidade,'#4D9EFF')+pl(t.form,'#B06EFF')+pl('Fund. '+t.ano,'#4E6080','var(--surf)')+'</div></div>';
+  o+='<div style="display:flex;justify-content:center;gap:7px;flex-wrap:wrap">'+pl(t.cidade||'Goiânia','#4D9EFF')+(t.formacao||t.form?pl(t.formacao||t.form,'#B06EFF'):'')+'</div></div>';
   o+='<div class="atabs">';
   [['info','📊'],['elenco','👥'],['jogos','📅'],['chat','💬']].forEach(function(a){
     var active=S.tAba===a[0];
@@ -2599,7 +2599,7 @@ function screenTimeDetalhe(t){
   o+='</div>';
   if(S.tAba==='info'){
     o+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:9px">';
-    [{l:'Vitórias',v:t.vit,c:'#00F082'},{l:'Empates',v:t.emp,c:'#FFBE00'},{l:'Derrotas',v:t.der,c:'#FF4060'}].forEach(function(s){
+    [{l:'Vitórias',v:(t.vit||0),c:'#00F082'},{l:'Empates',v:(t.emp||0),c:'#FFBE00'},{l:'Derrotas',v:(t.der||0),c:(t.der||0)>0?'#FF4060':'var(--muted)'}].forEach(function(s){
       o+='<div class="scard"><div style="color:'+s.c+';font-weight:900;font-size:27px">'+s.v+'</div><div class="slbl">'+s.l+'</div></div>';
     });
     o+='</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:14px">';
@@ -2626,7 +2626,8 @@ function screenTimeDetalhe(t){
         var m = membros[uid];
         var isCapt = uid===t.capitao;
         o+='<div class="card" style="display:flex;align-items:center;gap:11px;padding:10px 13px">';
-        o+=av(null,34,isCapt?'var(--gold)':'var(--green)');
+        var inicial=(m.nome||'?').charAt(0).toUpperCase();
+o+='<div style="width:34px;height:34px;border-radius:50%;background:'+(isCapt?'var(--gold)':'var(--green)')+';display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#000;flex-shrink:0">'+inicial+'</div>';
         o+='<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(m.nome||'Jogador')+'</div>';
         o+='<div style="color:var(--muted);font-size:11px;margin-top:2px">'+(isCapt?'👑 Capitão':(m.cargo||'Jogador'))+'</div></div>';
         o+='</div>';
