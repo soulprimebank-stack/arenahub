@@ -380,6 +380,28 @@ function setNav(id){
 function render(){
   var el=document.getElementById('screen');
   if(!el)return;
+  // --- INPUT PRESERVATION: salva valores/foco/cursor antes de destruir DOM ---
+  var _inputSnapshot = {};
+  var _focusedId = null, _focusStart = null, _focusEnd = null;
+  try{
+    var _active = document.activeElement;
+    var _inputs = el.querySelectorAll('input[id], textarea[id], select[id]');
+    for(var _i=0; _i<_inputs.length; _i++){
+      var _inp = _inputs[_i];
+      // Não preserva inputs de tipos que não fazem sentido (button/submit/file)
+      if(_inp.type==='button'||_inp.type==='submit'||_inp.type==='file'||_inp.type==='reset') continue;
+      if(_inp.type==='checkbox'||_inp.type==='radio'){
+        _inputSnapshot[_inp.id] = {checked: _inp.checked, type: _inp.type};
+      } else {
+        _inputSnapshot[_inp.id] = {value: _inp.value, type: _inp.type||'text', isSelect: _inp.tagName==='SELECT'};
+      }
+      if(_inp === _active){
+        _focusedId = _inp.id;
+        try{ _focusStart = _inp.selectionStart; _focusEnd = _inp.selectionEnd; }catch(_e){}
+      }
+    }
+  }catch(_e){}
+  // --- fim do snapshot ---
   if(!S.logado){el.innerHTML=screenLogin();setNav('');refreshBadges();return;}
   if(S.busca&&S.busca.length>1){el.innerHTML=screenBusca();setNav('');refreshBadges();setTimeout(bindEvents,50);return;}
   try{
@@ -390,6 +412,34 @@ function render(){
   }catch(e){el.innerHTML='<div style="padding:20px;color:var(--red)">Erro: '+e.message+'</div>';}
   setNav(S.scr);
   refreshBadges();
+  // --- INPUT RESTORATION: re-injeta valores salvos no DOM novo ---
+  try{
+    for(var _id in _inputSnapshot){
+      var _newEl = document.getElementById(_id);
+      if(!_newEl) continue;
+      var _snap = _inputSnapshot[_id];
+      if(_snap.type==='checkbox'||_snap.type==='radio'){
+        _newEl.checked = _snap.checked;
+      } else if(_snap.isSelect){
+        // Select: só restaura se o valor antigo existe como option no select novo
+        var _opts = _newEl.options;
+        for(var _oi=0; _oi<_opts.length; _oi++){
+          if(_opts[_oi].value === _snap.value){ _newEl.value = _snap.value; break; }
+        }
+      } else {
+        // Só restaura se o novo elemento está vazio (evita sobrescrever valor default novo)
+        if(_newEl.value==='' || _newEl.value==null) _newEl.value = _snap.value;
+      }
+    }
+    if(_focusedId){
+      var _fEl = document.getElementById(_focusedId);
+      if(_fEl){
+        _fEl.focus();
+        try{ if(_focusStart!=null) _fEl.setSelectionRange(_focusStart, _focusEnd); }catch(_e){}
+      }
+    }
+  }catch(_e){}
+  // --- fim da restauração ---
   setTimeout(bindEvents,50);
 }
 function toggleSearch(){
