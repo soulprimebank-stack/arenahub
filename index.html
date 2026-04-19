@@ -1703,6 +1703,7 @@ function backCampo(){S.cEtapa='campo';render();sc();}
 /* ── TORNEIOS ACTIONS ─────────────────────────────── */
 function setTornAba(a){S.tornAba=a;render();}
 function openTorn(id){
+  S.scr='torneios';
   var lista = D.torneiosFirestore.length>0 ? D.torneiosFirestore : D.torneios;
   for(var i=0;i<lista.length;i++){if(lista[i].id===id){S.tornSel=lista[i];break;}}
   render();sc();
