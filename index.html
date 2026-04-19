@@ -8,7 +8,10 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#07090F" id="theme-meta"/>
 <meta name="description" content="FutStory — Futebol amador na palma da mão"/>
-<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;FutStory&quot;,&quot;short_name&quot;:&quot;FutStory&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%2307090F&quot;,&quot;theme_color&quot;:&quot;%2300F082&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;,&quot;sizes&quot;:&quot;any&quot;}]}"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
 <title>FutStory ⚽</title>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -1730,6 +1733,15 @@ function _carregarJogadoresFirestore(){
 function setCAbH(a){S.cAbaH=a;render();}
 function _horaFim(h){ var n=parseInt(h)+1; return (n<10?'0':'')+n+':00'; }
 function _onReservaData(val){ S.reservaData=val; S.reservaHora=''; render(); }
+function _selHora(h){
+  S.reservaHora = h;
+  render();
+  // Após render, scroll suave até o card de resumo (onde está o botão de pagamento)
+  setTimeout(function(){
+    var card = document.getElementById('reserva-resumo');
+    if(card) card.scrollIntoView({behavior:'smooth', block:'center'});
+  }, 80);
+}
 function _abrirPagamentoCampo(){
   if(!S.cSel){return;}
   // Montar horSel a partir da data e hora selecionadas
@@ -3269,7 +3281,7 @@ function screenCampoDetalhe(c){
       o+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
       horas.forEach(function(h){
         var sel = h === reservaHora;
-        o+='<button data-hora="'+h+'" onclick="S.reservaHora=this.dataset.hora;render()" style="padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid '+(sel?'var(--green)':'var(--bord)')+';background:'+(sel?'var(--green)':'var(--surf)')+';color:'+(sel?'var(--bg)':'var(--text2)')+'">'+h+'</button>';
+        o+='<button data-hora="'+h+'" onclick="_selHora(this.dataset.hora)" style="padding:10px 0;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;border:2px solid '+(sel?'var(--green)':'var(--bord)')+';background:'+(sel?'var(--green)':'var(--surf)')+';color:'+(sel?'var(--bg)':'var(--text2)')+'">'+h+'</button>';
       });
       o+='</div>';
       o+='</div>';
@@ -3321,7 +3333,7 @@ function screenCampoDetalhe(c){
   // Resumo + botão FORA do card — sem overflow
   if(S.cAbaDet==='reservar' && S.reservaData && S.reservaHora){
     var dataFmt2 = new Date(S.reservaData+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
-    o+='<div style="margin:14px 0 8px;background:linear-gradient(135deg,rgba(0,240,130,.1),var(--surf));border:1.5px solid rgba(0,240,130,.35);border-radius:14px;padding:14px">';
+    o+='<div id="reserva-resumo" style="margin:14px 0 8px;background:linear-gradient(135deg,rgba(0,240,130,.1),var(--surf));border:1.5px solid rgba(0,240,130,.35);border-radius:14px;padding:14px">';
     o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
     o+='<div><div style="font-weight:800;font-size:14px;text-transform:capitalize">'+esc(dataFmt2)+'</div>';
     o+='<div style="color:var(--muted);font-size:13px;margin-top:2px">🕐 '+S.reservaHora+' – '+_horaFim(S.reservaHora)+'</div></div>';
@@ -3924,6 +3936,28 @@ document.addEventListener('DOMContentLoaded', function(){
 try { _initFirebase(); } catch(e) {}
 render();
 startNotifTimer();
+
+// Registra Service Worker (PWA) — só em HTTPS/localhost
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js')
+      .then(function(reg) {
+        console.log('[SW] registrado, scope:', reg.scope);
+        // Detecta update e notifica o usuário
+        reg.addEventListener('updatefound', function() {
+          var newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', function() {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Há uma versão nova esperando
+              if (typeof toast === 'function') toast('Nova versão disponível! Recarregue a página 🔄');
+            }
+          });
+        });
+      })
+      .catch(function(err) { console.warn('[SW] falhou:', err); });
+  });
+}
 </script>
 </body>
 </html>
