@@ -197,6 +197,22 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
 .torn-card:active{background:var(--cardhi);}
 .torn-prog{height:5px;background:var(--surf);border-radius:99px;overflow:hidden;margin-top:8px;}
 .torn-prog-fill{height:100%;border-radius:99px;}
+/* Card de torneio no feed (anúncio entre posts) */
+.tcard-feed{position:relative;margin:14px 14px 18px;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid rgba(0,240,130,.35);background:linear-gradient(135deg,rgba(0,240,130,.14),rgba(0,212,200,.06) 55%,var(--card));box-shadow:0 4px 22px rgba(0,240,130,.08);transition:transform .15s;}
+.tcard-feed:active{transform:scale(.98);}
+.tcard-feed-badge{position:absolute;top:10px;right:10px;background:var(--green);color:var(--bg);font-weight:900;font-size:10px;letter-spacing:.08em;padding:4px 9px;border-radius:99px;z-index:2;}
+.tcard-feed-inner{padding:14px 14px 12px;display:flex;flex-direction:column;gap:10px;}
+.tcard-feed-hd{display:flex;align-items:flex-start;gap:12px;}
+.tcard-feed-emoji{width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+.tcard-feed-ttl{font-weight:900;font-size:16px;line-height:1.25;margin-bottom:4px;padding-right:70px;}
+.tcard-feed-sub{display:flex;gap:6px;flex-wrap:wrap;}
+.tcard-feed-chip{font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px;}
+.tcard-feed-stats{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--bord);}
+.tcard-feed-stat{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.tcard-feed-stat-l{font-size:9px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.tcard-feed-stat-v{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tcard-feed-cta{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--green);color:var(--bg);font-weight:900;font-size:13px;padding:10px 14px;border-radius:12px;border:none;cursor:pointer;width:100%;}
+.tcard-feed-cta:active{opacity:.85;}
 .mapa-bg{height:200px;display:flex;align-items:center;justify-content:center;position:relative;background:linear-gradient(135deg,#0C1A2E,#0A1520);border-radius:16px;overflow:hidden;margin-bottom:13px;border:1px solid var(--bord);}
 .mapa-grid{position:absolute;inset:0;opacity:.12;background-image:linear-gradient(rgba(77,158,255,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(77,158,255,.4) 1px,transparent 1px);background-size:28px 28px;}
 .mapa-pin{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:pointer;}
@@ -1811,6 +1827,46 @@ function _carregarTorneiosFirestore(){
       render();
     }).catch(function(e){ S.tornCarregando=false; console.log('torneios err:',e); });
 }
+/* Card de anúncio de torneio injetado no feed — rotaciona entre abertos */
+var _tornCardIdx = 0;
+function _getTornAbertos(){
+  var fonte = D.torneiosFirestore && D.torneiosFirestore.length>0 ? D.torneiosFirestore : (D.torneios||[]);
+  return fonte.filter(function(t){
+    // aberto E ainda com vagas
+    return t.status==='aberto' && (t.inscritos||0) < (t.maxTimes||0);
+  });
+}
+function _renderCardTornFeed(t){
+  if(!t) return '';
+  var cor = t.cor || '#00F082';
+  var pct = Math.round(((t.inscritos||0)/(t.maxTimes||1))*100);
+  var vagasRest = (t.maxTimes||0) - (t.inscritos||0);
+  var precoTxt = (!t.preco || t.preco==='0' || t.preco===0) ? 'Grátis' : ('R$ '+t.preco);
+  var o = '<div class="tcard-feed" data-tid="'+esc(t.id)+'" onclick="openTorn(this.dataset.tid)">';
+  o += '<div class="tcard-feed-badge">🏆 TORNEIO</div>';
+  o += '<div class="tcard-feed-inner">';
+  o += '<div class="tcard-feed-hd">';
+  o += '<div class="tcard-feed-emoji" style="background:'+cor+'22;border:1px solid '+cor+'55">'+(t.badge||'🏆')+'</div>';
+  o += '<div style="flex:1;min-width:0">';
+  o += '<div class="tcard-feed-ttl">'+esc(t.nome||'Torneio')+'</div>';
+  o += '<div class="tcard-feed-sub">';
+  o += '<span class="tcard-feed-chip" style="background:rgba(77,158,255,.15);color:#4D9EFF">'+esc(t.esporte||'Futebol')+'</span>';
+  o += '<span class="tcard-feed-chip" style="background:var(--surf);color:var(--muted)">📅 '+esc(t.data||'')+'</span>';
+  o += '</div></div></div>';
+  // Stats row
+  o += '<div class="tcard-feed-stats">';
+  o += '<div class="tcard-feed-stat"><span class="tcard-feed-stat-l">Prêmio</span><span class="tcard-feed-stat-v" style="color:'+cor+'">'+esc(t.premio||'—')+'</span></div>';
+  o += '<div class="tcard-feed-stat"><span class="tcard-feed-stat-l">Inscrição</span><span class="tcard-feed-stat-v">'+precoTxt+'</span></div>';
+  o += '<div class="tcard-feed-stat"><span class="tcard-feed-stat-l">Vagas</span><span class="tcard-feed-stat-v" style="color:'+(vagasRest<=3?'#FF7043':'var(--text)')+'">'+vagasRest+' rest.</span></div>';
+  o += '</div>';
+  // Progress bar
+  o += '<div class="torn-prog" style="margin-top:0"><div class="torn-prog-fill" style="width:'+pct+'%;background:'+cor+'"></div></div>';
+  o += '<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--muted)">🏟️ '+esc(t.campo||'Local a definir')+'</span><span style="color:var(--muted)">'+(t.inscritos||0)+'/'+(t.maxTimes||0)+' times</span></div>';
+  // CTA
+  o += '<button class="tcard-feed-cta" data-tid="'+esc(t.id)+'" onclick="event.stopPropagation();openTorn(this.dataset.tid)">Ver torneio e inscrever →</button>';
+  o += '</div></div>';
+  return o;
+}
 function _criarTorneioFirestore(){
   if(!_fbDb||!S.fbUser){ toast('Faça login'); return; }
   var nome = (document.getElementById('torn-nome')||{}).value||'';
@@ -2162,7 +2218,9 @@ function screenSocial(){
   if(feed.length===0){
     o+='<div class="empty" style="padding:48px 20px;text-align:center"><div style="font-size:48px;margin-bottom:12px">⚽</div><div style="font-weight:800;font-size:16px;margin-bottom:8px;color:var(--text)">Nenhuma publicação ainda</div><div style="color:var(--muted);font-size:13px;margin-bottom:20px">Seja o primeiro a publicar algo!</div><button class="btn bp" onclick="openPostModal()">📱 Criar publicação</button></div>';
   }
-  feed.forEach(function(post){
+  // Pre-compute torneios abertos para injetar a cada 5 posts (só na aba "Para você")
+  var _tAbertos = (S.feedTab==='todos') ? _getTornAbertos() : [];
+  feed.forEach(function(post, _idx){
     var cor=TCOR[post.tipo]||'#4E6080';
     var curtido=S.curtidos[String(post.id)];
     var salvo=S.salvos[String(post.id)];
@@ -2236,6 +2294,12 @@ function screenSocial(){
         '<input class="cinput" placeholder="Adicionar comentário..."><button class="csend">↑</button></div></div>';
     }
     o+='</div>';
+    // Injeta card de torneio a cada 5 posts (rotacionando entre os abertos)
+    if(_tAbertos.length>0 && (_idx+1) % 5 === 0){
+      var _tPick = _tAbertos[_tornCardIdx % _tAbertos.length];
+      _tornCardIdx++;
+      o += _renderCardTornFeed(_tPick);
+    }
   });
   o+='</div>';
   return o;
