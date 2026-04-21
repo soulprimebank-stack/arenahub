@@ -849,6 +849,10 @@ function salvarPerfil(){
 
 /* ── FIREBASE AUTH ────────────────────────────────── */
 var _fbApp=null,_fbAuth=null,_fbDb=null,_feedUnsub=null;
+// Backend de pagamentos (Vercel + Sunize)
+var API_BACKEND='https://futstory-backend.vercel.app';
+var _polling=null; // timer do polling de status de pagamento
+var _pagAtual=null; // dados do pagamento em andamento
 
 function _initFirebase(){
   if(_fbAuth)return _fbAuth;
@@ -1399,6 +1403,122 @@ function _salvarPerfilFirestore(){
     .catch(function(err){ console.warn('Erro ao salvar perfil:',err); });
 }
 
+/* ── PAGAMENTO REAL (Sunize via Backend Vercel) ────────────── */
+
+// Validação básica de CPF (11 dígitos + dígitos verificadores)
+function _validarCPF(cpf){
+  cpf=String(cpf).replace(/\D/g,'');
+  if(cpf.length!==11)return false;
+  if(/^(\d)\1+$/.test(cpf))return false;
+  var soma=0,resto;
+  for(var i=1;i<=9;i++)soma+=parseInt(cpf.charAt(i-1))*(11-i);
+  resto=(soma*10)%11;
+  if(resto===10||resto===11)resto=0;
+  if(resto!==parseInt(cpf.charAt(9)))return false;
+  soma=0;
+  for(var j=1;j<=10;j++)soma+=parseInt(cpf.charAt(j-1))*(12-j);
+  resto=(soma*10)%11;
+  if(resto===10||resto===11)resto=0;
+  return resto===parseInt(cpf.charAt(10));
+}
+
+// Formata CPF: 12345678901 -> 123.456.789-01
+function _formatarCPF(cpf){
+  cpf=String(cpf).replace(/\D/g,'').slice(0,11);
+  if(cpf.length<=3)return cpf;
+  if(cpf.length<=6)return cpf.slice(0,3)+'.'+cpf.slice(3);
+  if(cpf.length<=9)return cpf.slice(0,3)+'.'+cpf.slice(3,6)+'.'+cpf.slice(6);
+  return cpf.slice(0,3)+'.'+cpf.slice(3,6)+'.'+cpf.slice(6,9)+'-'+cpf.slice(9);
+}
+
+// Formata telefone: 62999999999 -> (62) 99999-9999
+function _formatarTelefone(tel){
+  tel=String(tel).replace(/\D/g,'').slice(0,11);
+  if(tel.length<=2)return tel;
+  if(tel.length<=7)return '('+tel.slice(0,2)+') '+tel.slice(2);
+  return '('+tel.slice(0,2)+') '+tel.slice(2,7)+'-'+tel.slice(7);
+}
+
+// Cria pagamento no backend, recebe pixPayload
+function _criarPagamento(dados, callback){
+  if(!S.fbUser){ toast('Faça login primeiro'); return; }
+  fetch(API_BACKEND+'/api/criar-pagamento',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      tipo: dados.tipo, // 'reserva_campo' ou 'inscricao_torneio'
+      refId: dados.refId,
+      valor: dados.valor,
+      descricao: dados.descricao,
+      cliente: dados.cliente,
+      uidUsuario: S.fbUser.uid
+    })
+  }).then(function(r){return r.json();})
+    .then(function(resp){
+      if(resp.sucesso && resp.pixPayload){
+        callback(null, resp);
+      }else{
+        callback(resp.erro||'Erro desconhecido', null);
+      }
+    })
+    .catch(function(e){ callback('Sem conexão: '+e.message, null); });
+}
+
+// Inicia polling de status de pagamento (a cada 4s)
+function _iniciarPollingStatus(transactionId, onAprovado, onErro){
+  if(_polling) clearInterval(_polling);
+  var tentativas=0;
+  var maxTentativas=150; // 10 minutos
+  _polling=setInterval(function(){
+    tentativas++;
+    if(tentativas>maxTentativas){
+      clearInterval(_polling); _polling=null;
+      toast('Tempo esgotado. Verifique manualmente.');
+      return;
+    }
+    fetch(API_BACKEND+'/api/status-pagamento?id='+encodeURIComponent(transactionId))
+      .then(function(r){return r.json();})
+      .then(function(resp){
+        if(resp.status==='AUTHORIZED'){
+          clearInterval(_polling); _polling=null;
+          onAprovado&&onAprovado(resp);
+        }else if(resp.status==='FAILED'||resp.status==='CHARGEBACK'){
+          clearInterval(_polling); _polling=null;
+          onErro&&onErro(resp.status);
+        }
+        // Se PENDING, continua polling
+      })
+      .catch(function(){ /* ignora erros temporários */ });
+  },4000);
+}
+
+function _pararPolling(){
+  if(_polling){ clearInterval(_polling); _polling=null; }
+}
+
+// Copia código PIX para área de transferência
+function _copiarPix(payload){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(payload).then(function(){
+      toast('Código PIX copiado! 📋');
+    }).catch(function(){
+      _copiarPixFallback(payload);
+    });
+  }else{
+    _copiarPixFallback(payload);
+  }
+}
+
+function _copiarPixFallback(payload){
+  var ta=document.createElement('textarea');
+  ta.value=payload; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); toast('Código PIX copiado! 📋'); }
+  catch(e){ toast('Selecione e copie manualmente'); }
+  document.body.removeChild(ta);
+}
+
 function _tempoRelativo(ts){
   if(!ts)return 'agora';
   var agora=Date.now();
@@ -1840,8 +1960,70 @@ function _abrirPagamentoCampo(){
 function selectHor(id){for(var i=0;i<D.horarios.length;i++){if(D.horarios[i].id===id){S.horSel=D.horarios[i];break;}}render();}
 function setPagMet(m){S.pagMet=m;render();}
 function setPagJog(n){S.pagJog=Math.max(1,Math.min(22,n));render();}
-function confirmar(){S.cEtapa='confirmado';render();sc();}
-function backLista(){S.cEtapa='lista';S.cSel=null;S.horSel=null;render();sc();}
+function confirmar(){
+  // Pagamento real via Sunize — pede CPF/telefone, gera PIX
+  if(!S.fbUser){ toast('Faça login para reservar'); return; }
+  if(!S.cSel){ toast('Selecione um campo'); return; }
+  // Vai pra tela de coleta de dados (CPF/telefone) antes do PIX
+  S.cEtapa='coleta_dados';
+  // Pré-preencher se já temos do perfil
+  if(S.perfCPF) S._cpfTemp=S.perfCPF;
+  if(S.perfTelefone) S._telTemp=S.perfTelefone;
+  render();sc();
+}
+
+// Após coletar CPF/tel, gera PIX no backend
+function _gerarPixCampo(){
+  var cpfInp=document.getElementById('pag-cpf');
+  var telInp=document.getElementById('pag-tel');
+  if(!cpfInp||!telInp){toast('Erro nos campos');return;}
+  var cpf=cpfInp.value.replace(/\D/g,'');
+  var tel=telInp.value.replace(/\D/g,'');
+  if(!_validarCPF(cpf)){ toast('CPF inválido'); cpfInp.focus(); return; }
+  if(tel.length<10){ toast('Telefone inválido'); telInp.focus(); return; }
+  // Salva no perfil pra próxima vez (não envia pra Firestore — só local)
+  S.perfCPF=cpf;
+  S.perfTelefone=tel;
+  // Calcular valor (mínimo R$ 5)
+  var valor=parseFloat(S.cSel.preco||S.cSel.valor||50);
+  if(isNaN(valor)||valor<5)valor=5;
+  // Loading
+  var btn=document.getElementById('pag-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='Gerando PIX...';}
+  _criarPagamento({
+    tipo:'reserva_campo',
+    refId:'campo_'+S.cSel.id+'_'+(S.reservaData||'')+'_'+(S.reservaHora||'').replace(':',''),
+    valor:valor,
+    descricao:'Reserva: '+S.cSel.nome+' '+(S.horSel?S.horSel.data+' '+S.horSel.hora:''),
+    cliente:{
+      nome: S.perfNome||'Jogador',
+      email: S.perfEmail||'',
+      cpf: cpf,
+      telefone: '+55'+tel
+    }
+  },function(erro,resp){
+    if(btn){btn.disabled=false;btn.innerHTML='Gerar PIX';}
+    if(erro){ toast('❌ '+erro); return; }
+    _pagAtual={
+      transactionId: resp.transactionId,
+      pixPayload: resp.pixPayload,
+      valor: valor,
+      tipo: 'reserva_campo'
+    };
+    S.cEtapa='pix';
+    render();sc();
+    // Inicia polling
+    _iniciarPollingStatus(resp.transactionId, function(){
+      // Pagamento aprovado!
+      _pararPolling();
+      S.cEtapa='confirmado';
+      render();sc();
+    }, function(status){
+      toast('Pagamento '+status+'. Tente novamente.');
+    });
+  });
+}
+function backLista(){_pararPolling();S.cEtapa='lista';S.cSel=null;S.horSel=null;_pagAtual=null;render();sc();}
 function backCampo(){S.cEtapa='campo';render();sc();}
 
 /* ── TORNEIOS ACTIONS ─────────────────────────────── */
@@ -1857,28 +2039,71 @@ function inscreverTorn(){
   if(!S.tornSel||!_fbDb||!S.fbUser){toast('Faça login para se inscrever');return;}
   if(S.tornSel.inscricoes && S.tornSel.inscricoes[S.fbUser.uid]){toast('Você já está inscrito! ✅');return;}
   if(S.tornSel.inscritos>=S.tornSel.maxTimes){toast('Torneio lotado!');return;}
-  // Abrir tela de pagamento antes de confirmar inscrição
-  S.tornPagEtapa = 'pagamento';
-  S.tornPagMet = 'pix';
+  // Vai direto pra coleta de dados (CPF/tel) e depois PIX real
+  S.tornPagEtapa = 'coleta_dados';
+  if(S.perfCPF) S._cpfTemp=S.perfCPF;
+  if(S.perfTelefone) S._telTemp=S.perfTelefone;
   render(); sc();
 }
 function _confirmarInscricaoTorn(){
-  if(!S.tornSel||!_fbDb||!S.fbUser) return;
-  var ref = _fbDb.collection('torneios').doc(S.tornSel.id);
-  var upd = {inscritos: firebase.firestore.FieldValue.increment(1)};
-  upd['inscricoes.'+S.fbUser.uid] = {
-    nome: S.perfNome||S.fbUser.displayName||'Jogador',
-    uid: S.fbUser.uid,
-    pagMet: S.tornPagMet,
-    quando: firebase.firestore.FieldValue.serverTimestamp()
-  };
-  ref.update(upd).then(function(){
-    if(!S.tornSel.inscricoes) S.tornSel.inscricoes = {};
-    S.tornSel.inscricoes[S.fbUser.uid] = true;
-    S.tornSel.inscritos = (S.tornSel.inscritos||0)+1;
-    S.tornPagEtapa = 'confirmado';
-    render(); sc();
-  }).catch(function(e){ toast('Erro: '+e.message); });
+  // Pagamento real via Sunize — vai pra coleta de CPF/tel
+  if(!S.tornSel||!S.fbUser) return;
+  S.tornPagEtapa='coleta_dados';
+  if(S.perfCPF) S._cpfTemp=S.perfCPF;
+  if(S.perfTelefone) S._telTemp=S.perfTelefone;
+  render(); sc();
+}
+
+// Após coletar dados, gera PIX no backend pra inscrição
+function _gerarPixTorn(){
+  var cpfInp=document.getElementById('pag-cpf');
+  var telInp=document.getElementById('pag-tel');
+  if(!cpfInp||!telInp){toast('Erro nos campos');return;}
+  var cpf=cpfInp.value.replace(/\D/g,'');
+  var tel=telInp.value.replace(/\D/g,'');
+  if(!_validarCPF(cpf)){ toast('CPF inválido'); cpfInp.focus(); return; }
+  if(tel.length<10){ toast('Telefone inválido'); telInp.focus(); return; }
+  S.perfCPF=cpf; S.perfTelefone=tel;
+  // Calcular valor (mínimo R$ 5)
+  var valor=parseFloat(S.tornSel.preco||0);
+  if(isNaN(valor)||valor<5)valor=5;
+  var btn=document.getElementById('pag-btn');
+  if(btn){btn.disabled=true;btn.innerHTML='Gerando PIX...';}
+  _criarPagamento({
+    tipo:'inscricao_torneio',
+    refId: S.tornSel.id,
+    valor: valor,
+    descricao: 'Inscrição: '+S.tornSel.nome,
+    cliente:{
+      nome: S.perfNome||'Jogador',
+      email: S.perfEmail||'',
+      cpf: cpf,
+      telefone: '+55'+tel
+    }
+  },function(erro,resp){
+    if(btn){btn.disabled=false;btn.innerHTML='Gerar PIX';}
+    if(erro){ toast('❌ '+erro); return; }
+    _pagAtual={
+      transactionId: resp.transactionId,
+      pixPayload: resp.pixPayload,
+      valor: valor,
+      tipo: 'inscricao_torneio'
+    };
+    S.tornPagEtapa='pix';
+    render();sc();
+    _iniciarPollingStatus(resp.transactionId, function(){
+      // Pagamento aprovado! Backend já marcou inscrição como paga via webhook
+      // ou via update no /api/status-pagamento. Refletir na UI:
+      _pararPolling();
+      if(!S.tornSel.inscricoes) S.tornSel.inscricoes = {};
+      S.tornSel.inscricoes[S.fbUser.uid] = true;
+      S.tornSel.inscritos = (S.tornSel.inscritos||0)+1;
+      S.tornPagEtapa='confirmado';
+      render();sc();
+    }, function(status){
+      toast('Pagamento '+status+'. Tente novamente.');
+    });
+  });
 }
 function _setTornPagMet(m){ S.tornPagMet=m; render(); }
 function screenTornPagamento(t){
@@ -1954,6 +2179,80 @@ function screenTornConfirmado(t){
   });
   o += '</div>';
   o += '<button class="btn bp bsm" onclick="S.tornPagEtapa=null;S.tornSel=null;go(\'torneios\');">← Voltar aos torneios</button>';
+  o += '</div>';
+  return o;
+}
+
+/* ── TELAS DE PAGAMENTO REAL (Sunize PIX) ─────────────────── */
+
+// Tela 1: coleta CPF e telefone (LGPD: pedimos só o necessário)
+function screenColetaDadosPagamento(opts){
+  // opts: { titulo, valor, descricao, voltar (fn js), continuar (fn name) }
+  var o = '<div class="fu" style="padding:14px">';
+  o += '<button onclick="'+opts.voltar+'" style="background:var(--surf);border:1px solid var(--bord);width:36px;height:36px;border-radius:50%;color:var(--text);font-size:16px;cursor:pointer;margin-bottom:12px">←</button>';
+  o += '<h3 style="font-weight:900;font-size:19px;margin:0 0 6px">📋 Confirme seus dados</h3>';
+  o += '<p style="color:var(--text2);font-size:13px;margin-bottom:18px">Necessário para emissão da cobrança PIX. Seus dados são protegidos.</p>';
+  // Resumo
+  o += '<div class="card" style="margin-bottom:18px;background:rgba(0,240,130,.06);border-color:rgba(0,240,130,.3)">';
+  o += '<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+esc(opts.descricao||'')+'</div>';
+  o += '<div style="font-weight:900;font-size:24px;color:var(--green)">R$ '+Number(opts.valor).toFixed(2).replace('.',',')+'</div>';
+  o += '</div>';
+  // Form
+  var cpfVal = S._cpfTemp || S.perfCPF || '';
+  var telVal = S._telTemp || S.perfTelefone || '';
+  o += '<div style="margin-bottom:14px">';
+  o += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase">Nome completo</label>';
+  o += '<div style="background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px">'+esc(S.perfNome||'(sem nome)')+'</div>';
+  o += '</div>';
+  o += '<div style="margin-bottom:14px">';
+  o += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase">CPF</label>';
+  o += '<input id="pag-cpf" value="'+_formatarCPF(cpfVal)+'" oninput="this.value=_formatarCPF(this.value)" maxlength="14" placeholder="000.000.000-00" inputmode="numeric" style="width:100%;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;outline:none" />';
+  o += '</div>';
+  o += '<div style="margin-bottom:18px">';
+  o += '<label style="display:block;font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase">Celular (com DDD)</label>';
+  o += '<input id="pag-tel" value="'+_formatarTelefone(telVal)+'" oninput="this.value=_formatarTelefone(this.value)" maxlength="15" placeholder="(62) 99999-9999" inputmode="tel" style="width:100%;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;outline:none" />';
+  o += '</div>';
+  o += '<button id="pag-btn" class="btn bp" style="width:100%;font-size:15px;padding:14px" onclick="'+opts.continuar+'()">Gerar PIX</button>';
+  o += '<p style="color:var(--muted);font-size:11px;margin-top:14px;text-align:center">🔒 Pagamento processado de forma segura</p>';
+  o += '</div>';
+  return o;
+}
+
+// Tela 2: mostra QR code + código PIX + aguarda pagamento
+function screenPixGerado(opts){
+  // opts: { voltar (js inline), tipoPag ('campo'|'torneio') }
+  var pag = _pagAtual;
+  if(!pag||!pag.pixPayload){
+    return '<div class="fu" style="padding:14px"><p>Erro ao carregar pagamento</p><button class="btn bp" onclick="'+opts.voltar+'">Voltar</button></div>';
+  }
+  var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data='+encodeURIComponent(pag.pixPayload);
+  var o = '<div class="fu" style="padding:14px">';
+  o += '<button onclick="if(confirm(\'Cancelar o pagamento?\')){_pararPolling();'+opts.voltar+'}" style="background:var(--surf);border:1px solid var(--bord);width:36px;height:36px;border-radius:50%;color:var(--text);font-size:16px;cursor:pointer;margin-bottom:12px">←</button>';
+  o += '<h3 style="font-weight:900;font-size:19px;margin:0 0 6px;text-align:center">💠 Pague com PIX</h3>';
+  o += '<p style="color:var(--text2);font-size:13px;margin-bottom:18px;text-align:center">Use o QR Code ou copie o código abaixo</p>';
+  // Valor
+  o += '<div class="card" style="margin-bottom:14px;text-align:center;background:rgba(0,240,130,.06);border-color:rgba(0,240,130,.3)">';
+  o += '<div style="font-size:11px;color:var(--text2);text-transform:uppercase;margin-bottom:4px">Valor</div>';
+  o += '<div style="font-weight:900;font-size:28px;color:var(--green)">R$ '+Number(pag.valor).toFixed(2).replace('.',',')+'</div>';
+  o += '</div>';
+  // QR Code
+  o += '<div style="display:flex;justify-content:center;margin-bottom:14px">';
+  o += '<div style="background:#fff;padding:14px;border-radius:14px;border:1px solid var(--bord)">';
+  o += '<img src="'+qrUrl+'" alt="QR Code PIX" style="display:block;width:240px;height:240px" />';
+  o += '</div></div>';
+  // Código copia-e-cola
+  o += '<label style="display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase">Ou copie o código:</label>';
+  o += '<div style="background:var(--surf);border:1.5px dashed var(--bord);border-radius:10px;padding:11px;font-family:monospace;font-size:11px;color:var(--text2);word-break:break-all;margin-bottom:10px;max-height:90px;overflow-y:auto">';
+  o += esc(pag.pixPayload);
+  o += '</div>';
+  o += '<button class="btn bp" style="width:100%;font-size:14px;padding:13px;margin-bottom:12px" onclick="_copiarPix(\''+pag.pixPayload.replace(/'/g,"\\'")+'\')">📋 Copiar código PIX</button>';
+  // Status aguardando
+  o += '<div style="text-align:center;padding:14px;background:var(--surf);border-radius:12px;border:1px solid var(--bord)">';
+  o += '<div style="display:inline-block;width:14px;height:14px;border:2px solid var(--green);border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;margin-right:9px;vertical-align:middle"></div>';
+  o += '<span style="color:var(--text2);font-size:13px;vertical-align:middle">Aguardando pagamento...</span>';
+  o += '</div>';
+  o += '<style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+  o += '<p style="color:var(--muted);font-size:11px;margin-top:14px;text-align:center">Após o pagamento a confirmação é automática (até 30 segundos)</p>';
   o += '</div>';
   return o;
 }
@@ -2929,6 +3228,17 @@ function screenTorneios(){
 }
 function screenTornDetalhe(t){
   // Intercept pagamento etapas
+  if(S.tornPagEtapa==='coleta_dados') return screenColetaDadosPagamento({
+    titulo: 'Inscrição em Torneio',
+    valor: Math.max(5, parseFloat(t.preco||5)),
+    descricao: 'Inscrição: '+t.nome,
+    voltar: 'S.tornPagEtapa=null;render()',
+    continuar: '_gerarPixTorn'
+  });
+  if(S.tornPagEtapa==='pix') return screenPixGerado({
+    voltar: 'S.tornPagEtapa=null;render()',
+    tipoPag: 'torneio'
+  });
   if(S.tornPagEtapa==='pagamento') return screenTornPagamento(t);
   if(S.tornPagEtapa==='confirmado') return screenTornConfirmado(t);
 
@@ -3013,6 +3323,17 @@ function screenCriarTorneio(){
 function screenCampos(){
   if(S.cCadastr)return screenCadastrarCampo();
   if(S.cEtapa==='confirmado')return screenCampoConfirmado();
+  if(S.cEtapa==='coleta_dados')return screenColetaDadosPagamento({
+    titulo: 'Reserva de Campo',
+    valor: Math.max(5, parseFloat((S.cSel&&(S.cSel.preco||S.cSel.valor))||5)),
+    descricao: 'Reserva: '+(S.cSel?S.cSel.nome:'')+(S.horSel?' - '+S.horSel.data+' '+S.horSel.hora:''),
+    voltar: 'S.cEtapa=\'pagamento\';render()',
+    continuar: '_gerarPixCampo'
+  });
+  if(S.cEtapa==='pix')return screenPixGerado({
+    voltar: 'S.cEtapa=\'coleta_dados\';render()',
+    tipoPag: 'campo'
+  });
   if(S.cEtapa==='pagamento')return screenPagamento();
   if(S.cEtapa==='campo'&&S.cSel)return screenCampoDetalhe(S.cSel);
 
@@ -3452,7 +3773,7 @@ function screenPagamento(){
     o+='</div>';
   });
   o+='</div>';
-  o+='<button class="btn bp bfw blg" onclick="confirmar()">Confirmar Reserva · R$ '+preco+'</button></div>';
+  o+='<button class="btn bp bfw blg" onclick="confirmar()">💳 Pagar R$ '+preco+' (PIX)</button></div>';
   return o;
 }
 function screenCampoConfirmado(){
