@@ -192,32 +192,53 @@ function logout(){
 
 // ============ CARREGAR DADOS ============
 async function carregarDados(){
-  if(!S.idToken) return;
+  // Renovar token antes de cada chamada (evita token expirado)
+  if(auth.currentUser){
+    try {
+      S.idToken = await auth.currentUser.getIdToken(false);
+    } catch(e) {
+      renderLogin('Sessão expirou. Faça login novamente.');
+      return;
+    }
+  }
+  if(!S.idToken){
+    renderLogin('Você precisa fazer login.');
+    return;
+  }
   document.getElementById('app').innerHTML = '<div class="loading"><span class="spinner"></span> Carregando pagamentos...</div>';
   try {
     var repassado = S.tab==='repassados' ? 'true' : (S.tab==='pendentes' ? 'false' : 'all');
     var resp = await fetch(API_BACKEND + '/api/admin-listar?repassado=' + repassado, {
       headers: { 'Authorization': 'Bearer ' + S.idToken }
     });
-    var data = await resp.json();
+    var data = await resp.json().catch(function(){ return {}; });
     if(!resp.ok){
       if(resp.status===403){
         document.getElementById('app').innerHTML = 
           '<div class="err-box" style="max-width:500px;margin:60px auto">' +
           '<strong>Acesso negado</strong><br>' +
-          'Sua conta <code>' + esc(S.user.email) + '</code> não está autorizada como admin.<br><br>' +
-          '<button class="btn sml" onclick="logout()">Sair</button>' +
+          (data.erro || 'Sua conta não tem permissão') + '<br><br>' +
+          '<button class="btn sml" onclick="logout()">Sair</button> ' +
+          '<button class="btn sml sec" onclick="carregarDados()">Tentar de novo</button>' +
           '</div>';
         return;
       }
-      throw new Error(data.erro || 'Erro ' + resp.status);
+      throw new Error((data.erro || 'Erro ' + resp.status));
     }
     S.data = data;
     S.selecionados.clear();
     renderDashboard();
   } catch(e) {
+    var msg = e.message || String(e);
+    // Failed to fetch geralmente é CORS ou backend offline
+    if(msg.includes('Failed to fetch')){
+      msg = 'Não conseguiu conectar ao servidor. Verifique conexão. (Backend pode estar redesployando — espere 30s e tente de novo)';
+    }
     document.getElementById('app').innerHTML = 
-      '<div class="err-box">Erro ao carregar: ' + esc(e.message) + '<br><button class="btn sml" onclick="carregarDados()">Tentar novamente</button></div>';
+      '<div class="err-box">❌ Erro: ' + esc(msg) + 
+      '<br><br><button class="btn sml" onclick="carregarDados()">🔄 Tentar novamente</button> ' +
+      '<button class="btn sml sec" onclick="logout()">Sair e relogar</button>' +
+      '</div>';
   }
 }
 
