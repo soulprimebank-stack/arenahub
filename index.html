@@ -386,7 +386,8 @@ var S={
   tornAba:"abertos",tornSel:null,tornCriar:false,
   msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,stMidiaBlob:null,stMidiaFile:null,
   perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑",
-  resAba:"campos",resCarregando:false,resData:null
+  resAba:"campos",resCarregando:false,resData:null,
+  meusAba:"campos",meusCarregando:false,meusData:null,meusEditId:null
 };
 
 /* ── HELPERS ──────────────────────────────────────── */
@@ -445,7 +446,7 @@ function render(){
   try{
     var map={inicio:screenInicio,jogadores:screenJogadores,torneios:screenTorneios,
              campos:screenCampos,social:screenSocial,mensagens:screenMensagens,times:screenTimes,
-             ranking:screenRanking,historico:screenHistorico};
+             ranking:screenRanking,historico:screenHistorico,meuscampos:screenMeusCampos};
     el.innerHTML=S.admin?screenAdmin():(map[S.scr]||screenSocial)();
   }catch(e){el.innerHTML='<div style="padding:20px;color:var(--red)">Erro: '+e.message+'</div>';}
   setNav(S.scr);
@@ -621,6 +622,7 @@ function openPerfil(){
     }).join('')+'</div>'+dv()+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();openEditPerfil()">✏️ Editar Perfil</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'historico\')">📅 Minhas Reservas</button>'+
+    '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'meuscampos\')">🏠 Meus Campos</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'ranking\')">🏆 Ranking</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'mensagens\')">💬 Mensagens</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();_pwaInstall&&_pwaInstall()">📲 Instalar app</button>'+
@@ -631,7 +633,15 @@ function openPerfil(){
 function openAdmin(){S.admin=true;S.adminAba='dashboard';render();sc();}
 function openPostModal(){S.pTipo='post';S.pTxt='';S.pMidiaUrl=null;S.pMidiaTipo=null;renderPostModal();}
 function renderPostModal(){
-  var tipos=[{id:'post',l:'✏️ Post'},{id:'gol',l:'⚽ Gol'},{id:'vaga',l:'🔍 Vaga'},{id:'resultado',l:'🏆 Resultado'}];
+  var tipos=[
+    {id:'post',l:'✏️ Post', ph:'O que você quer compartilhar? 💬'},
+    {id:'gol',l:'⚽ Gol', ph:'Conta a jogada! Quem fez? Onde? 🥅'},
+    {id:'vaga',l:'🔍 Vaga', ph:'Falta jogador? Diga campo, horário e quantos faltam ⚡'},
+    {id:'resultado',l:'🏆 Resultado', ph:'Conta o resultado da partida! Quem ganhou? 🎯'},
+    {id:'promo',l:'🔥 Promoção', ph:'Divulgue sua promoção: desconto, horário, validade...'},
+    {id:'campo',l:'🏟️ Campo', ph:'Conte sobre o campo: avaliação, fotos, novidades 🌿'}
+  ];
+  var tipoAtual = tipos.find(function(t){return t.id===S.pTipo;}) || tipos[0];
   var tybtns=tipos.map(function(t){return '<button class="ptyp'+(S.pTipo===t.id?' a':'')+'" onclick="S.pTipo=\''+t.id+'\';renderPostModal()">'+t.l+'</button>';}).join('');
   var midiaPreview='';
   if(S.pMidiaUrl){
@@ -644,7 +654,7 @@ function renderPostModal(){
   showModal(
     '<div style="font-weight:800;font-size:15px;margin:0 0 14px">📱 Nova publicação</div>'+
     '<div class="ptyps">'+tybtns+'</div>'+
-    '<textarea class="ptxt" id="ptxt" placeholder="O que está acontecendo no campo? 🏟️" style="min-height:90px">'+esc(S.pTxt)+'</textarea>'+
+    '<textarea class="ptxt" id="ptxt" placeholder="'+esc(tipoAtual.ph)+'" style="min-height:90px">'+esc(S.pTxt)+'</textarea>'+
     midiaPreview+
     '<div style="margin-bottom:14px">'+
     '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">📎 Mídia</div>'+
@@ -2775,6 +2785,8 @@ function screenSocial(){
     }
   });
   o+='</div>';
+  // Botão flutuante "+" pra criar post, sempre visível
+  o+='<button onclick="openPostModal()" aria-label="Criar publicação" style="position:fixed;bottom:88px;right:18px;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--teal));border:none;color:#07090F;font-size:30px;font-weight:900;cursor:pointer;z-index:90;box-shadow:0 6px 22px rgba(0,240,130,.45);display:flex;align-items:center;justify-content:center;transition:transform .15s" onmousedown="this.style.transform=\'scale(0.92)\'" onmouseup="this.style.transform=\'scale(1)\'" ontouchstart="this.style.transform=\'scale(0.92)\'" ontouchend="this.style.transform=\'scale(1)\'">+</button>';
   return o;
 }
 
@@ -4521,6 +4533,319 @@ function _carregarMinhasReservas(){
       console.error('Erro minhas reservas:', e);
       render();
     });
+}
+
+/* ── MEUS CAMPOS (TELA DO DONO) ────────────────────── */
+function screenMeusCampos() {
+  var o = '<div class="fu" style="padding:0 14px">';
+  o += bb('go(\'home\')');
+  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px">';
+  o += '<span class="stl">🏠 Meus Campos</span>';
+  o += '<button class="btn bs" style="padding:6px 12px;font-size:12px" onclick="_carregarMeusCampos()">🔄 Atualizar</button>';
+  o += '</div>';
+  
+  // Não logado
+  if (!S.fbUser) {
+    o += '<div style="text-align:center;padding:50px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">🔐</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Faça login para ver seus campos</div>';
+    o += '</div></div>';
+    return o;
+  }
+  
+  // Carregar dados
+  if (!S.meusData && !S.meusCarregando) {
+    setTimeout(_carregarMeusCampos, 50);
+  }
+  
+  if (S.meusCarregando) {
+    o += '<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:10px">⏳</div><div style="color:var(--muted);font-size:13px">Carregando...</div></div>';
+    o += '</div>';
+    return o;
+  }
+  
+  if (!S.meusData) {
+    o += '<div style="text-align:center;padding:40px"><div style="color:var(--muted)">Aguardando...</div></div>';
+    o += '</div>';
+    return o;
+  }
+  
+  var campos = S.meusData.campos || [];
+  var reservas = S.meusData.reservas || [];
+  var totalArrecadado = 0;
+  var totalRepassado = 0;
+  reservas.forEach(function(r){
+    var v = Number(r.valor) || 0;
+    totalArrecadado += v;
+    if (r.repassado) totalRepassado += v;
+  });
+  var totalAReceber = totalArrecadado - totalRepassado;
+  
+  // Stats
+  o += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:18px">';
+  [
+    {l:'Campos',v:campos.length,c:'var(--text)'},
+    {l:'Arrecadado',v:'R$ '+totalArrecadado.toFixed(2).replace('.',','),c:'var(--green)'},
+    {l:'A receber',v:'R$ '+totalAReceber.toFixed(2).replace('.',','),c:'var(--yellow)'}
+  ].forEach(function(s){
+    o += '<div class="scard"><div style="color:' + s.c + ';font-weight:900;font-size:14px">' + s.v + '</div><div class="slbl">' + s.l + '</div></div>';
+  });
+  o += '</div>';
+  
+  // Abas
+  o += '<div style="display:flex;gap:6px;margin-bottom:13px">';
+  [
+    ['campos','🏟️ Campos', campos.length],
+    ['reservas','📅 Reservas recebidas', reservas.length]
+  ].forEach(function(a){
+    var act = S.meusAba === a[0];
+    o += '<button onclick="S.meusAba=\''+a[0]+'\';render()" style="flex:1;padding:9px 12px;border-radius:12px;font-size:12px;font-weight:700;border:1.5px solid '+(act?'var(--green)':'var(--bord)')+';background:'+(act?'rgba(0,240,130,.12)':'var(--surf)')+';color:'+(act?'var(--green)':'var(--text2)')+';cursor:pointer">'+a[1]+(a[2]?' <span style="background:'+(act?'var(--green)':'var(--bord)')+';color:'+(act?'var(--bg)':'var(--text2)')+';padding:1px 8px;border-radius:99px;font-size:11px;margin-left:4px">'+a[2]+'</span>':'')+'</button>';
+  });
+  o += '</div>';
+  
+  if (S.meusAba === 'campos') {
+    o += _renderMeusCamposLista(campos);
+  } else {
+    o += _renderMinhasReservasRecebidas(reservas);
+  }
+  
+  o += '</div>';
+  return o;
+}
+
+function _renderMeusCamposLista(campos) {
+  var o = '';
+  
+  // Botão de ação: cadastrar novo campo
+  o += '<button class="btn bp bfw" style="margin-bottom:13px;padding:11px" onclick="S.cCadastr=true;go(\'campos\')">➕ Cadastrar novo campo</button>';
+  
+  if (campos.length === 0) {
+    o += '<div style="text-align:center;padding:40px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">🏟️</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Nenhum campo cadastrado</div>';
+    o += '<div style="color:var(--muted);font-size:13px">Cadastre seu primeiro campo pra receber reservas.</div>';
+    o += '</div>';
+    return o;
+  }
+  
+  campos.forEach(function(c) {
+    o += '<div class="card" style="margin-bottom:10px;padding:14px" data-cid="'+c.id+'">';
+    // Header
+    o += '<div style="display:flex;align-items:center;gap:11px;margin-bottom:10px">';
+    o += '<div style="width:48px;height:48px;border-radius:12px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:24px">' + (c.img || '🏟️') + '</div>';
+    o += '<div style="flex:1;min-width:0">';
+    o += '<div style="font-weight:800;font-size:15px">' + esc(c.nome||'—') + '</div>';
+    if (c.enderecoCompleto || c.bairro) {
+      o += '<div style="color:var(--muted);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ' + esc(c.enderecoCompleto || c.bairro) + '</div>';
+    }
+    o += '</div>';
+    o += '<div style="text-align:right"><div style="color:var(--green);font-weight:900;font-size:15px">R$ '+Number(c.preco||0)+'</div><div style="font-size:10px;color:var(--muted)">/hora</div></div>';
+    o += '</div>';
+    
+    // Stats do campo
+    var totalReservasCampo = (S.meusData.reservas||[]).filter(function(r){ return r.campoId === c.id; }).length;
+    var totalValorCampo = (S.meusData.reservas||[]).filter(function(r){ return r.campoId === c.id; }).reduce(function(s,r){ return s+(Number(r.valor)||0); }, 0);
+    o += '<div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--bord);border-bottom:1px solid var(--bord);margin-bottom:10px;font-size:11px;color:var(--text2)">';
+    o += '<span>📅 '+totalReservasCampo+' reserva'+(totalReservasCampo!==1?'s':'')+'</span>';
+    o += '<span>💰 R$ '+totalValorCampo.toFixed(2).replace('.',',')+'</span>';
+    o += '<span>'+(c.chavePix?'🟢 PIX ativo':'🟡 PIX não definido')+'</span>';
+    o += '</div>';
+    
+    // Ações
+    o += '<div style="display:flex;gap:7px">';
+    o += '<button class="btn bs" style="flex:1;font-size:12px;padding:7px" onclick="_editarMeuCampo(\''+c.id+'\')">✏️ Editar</button>';
+    o += '<button class="btn bd" style="flex:1;font-size:12px;padding:7px" onclick="_deletarMeuCampo(\''+c.id+'\')">🗑️ Deletar</button>';
+    o += '</div>';
+    o += '</div>';
+  });
+  
+  return o;
+}
+
+function _renderMinhasReservasRecebidas(reservas) {
+  var o = '';
+  
+  if (reservas.length === 0) {
+    o += '<div style="text-align:center;padding:40px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">📅</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Nenhuma reserva ainda</div>';
+    o += '<div style="color:var(--muted);font-size:13px">Quando alguém reservar seus campos aparecerá aqui.</div>';
+    o += '</div>';
+    return o;
+  }
+  
+  reservas.forEach(function(r) {
+    o += '<div class="card" style="margin-bottom:9px;padding:13px 14px">';
+    o += '<div style="display:flex;align-items:center;gap:11px;margin-bottom:9px">';
+    o += '<div style="width:42px;height:42px;border-radius:10px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:20px">⚽</div>';
+    o += '<div style="flex:1;min-width:0">';
+    o += '<div style="font-weight:700;font-size:13px">' + esc(r.jogadorNome||'Jogador') + '</div>';
+    o += '<div style="color:var(--muted);font-size:11px;margin-top:1px">reservou <strong>'+esc(r.campoNome||'seu campo')+'</strong></div>';
+    if (r.reservaData) o += '<div style="color:var(--muted);font-size:11px;margin-top:2px">📅 ' + esc(r.reservaData) + (r.reservaHora?' · '+esc(r.reservaHora):'') + '</div>';
+    o += '</div>';
+    if (r.repassado) {
+      o += pl('✅ Recebido','#00F082');
+    } else {
+      o += pl('⏳ A receber','#FFBE00');
+    }
+    o += '</div>';
+    o += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:9px;border-top:1px solid var(--bord)">';
+    o += '<div><span style="font-size:11px;color:var(--muted)">💰 Valor</span><div style="font-weight:900;color:var(--green);font-size:15px">R$ '+Number(r.valor||0).toFixed(2).replace('.',',')+'</div></div>';
+    o += '<div style="text-align:right"><span style="font-size:10px;color:var(--muted)">Recebido em</span><div style="font-size:11px;color:var(--text2)">'+(r.criadoEm?_fmtData(r.criadoEm):'-')+'</div></div>';
+    o += '</div>';
+    o += '</div>';
+  });
+  
+  return o;
+}
+
+// Carregar dados dos campos do dono + reservas recebidas
+function _carregarMeusCampos(){
+  if (!S.fbUser || !_fbDb) return;
+  S.meusCarregando = true;
+  render();
+  
+  // Buscar campos do dono (Rules permitem qualquer logado ler campos)
+  var pCampos = _fbDb.collection('campos')
+    .where('donoUid','==',S.fbUser.uid)
+    .get();
+  
+  // Buscar pagamentos nos campos dele (Rules permitem ler se donoUid==currentUid)
+  var pReservas = _fbDb.collection('pagamentos')
+    .where('donoUid','==',S.fbUser.uid)
+    .where('status','==','AUTHORIZED')
+    .get();
+  
+  Promise.all([pCampos, pReservas])
+    .then(function(results){
+      var snapCampos = results[0];
+      var snapReservas = results[1];
+      
+      var campos = [];
+      snapCampos.forEach(function(d){
+        var c = d.data();
+        campos.push({
+          id: d.id,
+          nome: c.nome || '',
+          img: c.img || '🏟️',
+          preco: c.preco || 0,
+          bairro: c.bairro || '',
+          enderecoCompleto: c.enderecoCompleto || c.end || '',
+          chavePix: c.chavePix || null,
+          tipoChavePix: c.tipoChavePix || null,
+          donoNome: c.donoNome || '',
+          criadoEm: c.criadoEm && c.criadoEm.toMillis ? c.criadoEm.toMillis() : null
+        });
+      });
+      
+      var reservas = [];
+      snapReservas.forEach(function(d){
+        var p = d.data();
+        reservas.push({
+          id: d.id,
+          transactionId: p.transactionId || d.id,
+          valor: p.valor || 0,
+          campoId: p.campoId || null,
+          campoNome: p.campoNome || '',
+          jogadorUid: p.jogadorUid || null,
+          jogadorNome: p.jogadorNome || '',
+          jogadorEmail: p.jogadorEmail || '',
+          reservaData: p.reservaData || '',
+          reservaHora: p.reservaHora || '',
+          repassado: p.repassado === true,
+          criadoEm: p.criadoEm && p.criadoEm.toMillis ? p.criadoEm.toMillis() : null
+        });
+      });
+      
+      var byData = function(a,b){ return (b.criadoEm||0) - (a.criadoEm||0); };
+      campos.sort(byData);
+      reservas.sort(byData);
+      
+      S.meusData = { campos: campos, reservas: reservas };
+      S.meusCarregando = false;
+      render();
+    })
+    .catch(function(e){
+      S.meusCarregando = false;
+      S.meusData = { campos: [], reservas: [] };
+      toast('Erro ao carregar: ' + (e.code || e.message));
+      console.error('Erro meus campos:', e);
+      render();
+    });
+}
+
+// Deletar campo do dono (Rules já permitem só pro donoUid)
+function _deletarMeuCampo(campoId) {
+  if (!S.fbUser) return;
+  var campo = (S.meusData && S.meusData.campos || []).find(function(c){ return c.id === campoId; });
+  if (!campo) return;
+  
+  if (!confirm('Deletar o campo "' + campo.nome + '"?\n\nEssa ação não pode ser desfeita. Reservas já feitas continuarão existindo.')) {
+    return;
+  }
+  
+  _fbDb.collection('campos').doc(campoId).delete()
+    .then(function(){
+      toast('Campo deletado ✓');
+      _carregarMeusCampos();
+    })
+    .catch(function(e){
+      toast('Erro ao deletar: ' + e.code);
+    });
+}
+
+// Editar campo do dono (abre modal de edição simplificado)
+function _editarMeuCampo(campoId) {
+  if (!S.fbUser) return;
+  var campo = (S.meusData && S.meusData.campos || []).find(function(c){ return c.id === campoId; });
+  if (!campo) return;
+  
+  S.meusEditId = campoId;
+  var c = campo;
+  
+  var o = '<div style="font-weight:900;font-size:17px;margin-bottom:14px">✏️ Editar Campo</div>';
+  o += '<div class="fg"><label class="fl">Nome *</label><input class="fi" id="ed-nome" value="'+esc(c.nome||'')+'"></div>';
+  o += '<div class="fg"><label class="fl">Preço por hora (R$) *</label><input class="fi" id="ed-preco" type="number" value="'+(c.preco||0)+'"></div>';
+  o += '<div class="fg"><label class="fl">Emoji</label><input class="fi" id="ed-img" value="'+esc(c.img||'🏟️')+'" maxlength="2" style="font-size:22px;text-align:center"></div>';
+  o += '<div class="fg"><label class="fl">Chave PIX</label><input class="fi" id="ed-pix" value="'+esc(c.chavePix||'')+'" placeholder="CPF, email, telefone..."></div>';
+  o += '<div class="fg"><label class="fl">Tipo de chave PIX</label><select class="fi" id="ed-pixtipo">'+
+    ['CPF/CNPJ','Email','Telefone','Aleatória'].map(function(t){
+      return '<option value="'+t+'"'+(c.tipoChavePix===t?' selected':'')+'>'+t+'</option>';
+    }).join('')+'</select></div>';
+  o += '<div style="display:flex;gap:9px;margin-top:13px">';
+  o += '<button class="btn bs" style="flex:1" onclick="closeModal()">Cancelar</button>';
+  o += '<button class="btn bp" style="flex:1" onclick="_salvarEdicaoCampo()">Salvar ✓</button>';
+  o += '</div>';
+  showModal(o);
+}
+
+function _salvarEdicaoCampo() {
+  if (!S.fbUser || !S.meusEditId) return;
+  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  
+  var nome = get('ed-nome');
+  var preco = parseFloat(get('ed-preco'));
+  var img = get('ed-img') || '🏟️';
+  var pix = get('ed-pix');
+  var pixTipo = get('ed-pixtipo') || 'CPF/CNPJ';
+  
+  if (!nome) { toast('Nome é obrigatório'); return; }
+  if (!preco || preco < 5) { toast('Preço deve ser pelo menos R$ 5'); return; }
+  
+  _fbDb.collection('campos').doc(S.meusEditId).update({
+    nome: nome,
+    preco: preco,
+    img: img,
+    chavePix: pix || null,
+    tipoChavePix: pixTipo
+  }).then(function(){
+    closeModal();
+    toast('Campo atualizado ✓');
+    S.meusEditId = null;
+    _carregarMeusCampos();
+  }).catch(function(e){
+    toast('Erro ao salvar: ' + e.code);
+  });
 }
 
 /* ── RATING INTERATIVO DE CAMPO ─────────────────── */
