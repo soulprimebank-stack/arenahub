@@ -385,7 +385,8 @@ var S={
   comentando:null,vplay:null,
   tornAba:"abertos",tornSel:null,tornCriar:false,
   msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,stMidiaBlob:null,stMidiaFile:null,
-  perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑"
+  perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑",
+  resAba:"campos",resCarregando:false,resData:null
 };
 
 /* ── HELPERS ──────────────────────────────────────── */
@@ -4356,44 +4357,169 @@ function screenRanking() {
 
 /* ── SCREEN: HISTÓRICO ──────────────────────────── */
 function screenHistorico() {
-  var reservas = [
-    
-    {id:2, campo:'Campo do Cerrado',img:'⛳',data:'Ter 11/03',hora:'19:00',preco:90, status:'realizada', jog:6},
-    {id:3, campo:'Estádio Central',  img:'🏆',data:'Dom 09/03',hora:'09:00',preco:150,status:'realizada', jog:10},
-    {id:4, campo:'Quadra do Parque', img:'🌿',data:'Sex 07/03',hora:'18:00',preco:70, status:'cancelada', jog:5},
-  ];
-  var sCor = {confirmada:'#00F082', realizada:'#4D9EFF', cancelada:'#FF4060'};
-  var sLbl = {confirmada:'Confirmada ✅', realizada:'Realizada', cancelada:'Cancelada'};
   var o = '<div class="fu" style="padding:0 14px">';
-  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px"><span class="stl">📅 Minhas Reservas</span></div>';
+  o += bb('go(\'home\')');
+  o += '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px"><span class="stl">📅 Minhas Reservas</span>';
+  o += '<button class="btn bs" style="padding:6px 12px;font-size:12px" onclick="_carregarMinhasReservas()">🔄 Atualizar</button>';
+  o += '</div>';
+  
+  // Se não logado
+  if (!S.fbUser) {
+    o += '<div style="text-align:center;padding:50px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">🔐</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Faça login para ver suas reservas</div>';
+    o += '<div style="color:var(--muted);font-size:13px">Suas reservas e inscrições aparecem aqui depois do pagamento confirmado.</div>';
+    o += '</div></div>';
+    return o;
+  }
+  
+  // Carregar dados se nunca carregou
+  if (!S.resData && !S.resCarregando) {
+    setTimeout(_carregarMinhasReservas, 50);
+  }
+  
+  // Loading
+  if (S.resCarregando) {
+    o += '<div style="text-align:center;padding:40px 20px"><div style="font-size:32px;margin-bottom:10px">⏳</div><div style="color:var(--muted);font-size:13px">Carregando suas reservas...</div></div>';
+    o += '</div>';
+    return o;
+  }
+  
+  // Sem dados ainda (primeira carga ainda não terminou)
+  if (!S.resData) {
+    o += '<div style="text-align:center;padding:40px"><div style="color:var(--muted)">Aguardando...</div></div>';
+    o += '</div>';
+    return o;
+  }
+  
+  var campos = S.resData.campos || [];
+  var torneios = S.resData.torneios || [];
+  var totalGasto = 0;
+  campos.forEach(function(r){ totalGasto += Number(r.valor) || 0; });
+  torneios.forEach(function(r){ totalGasto += Number(r.valor) || 0; });
+  
   // Stats
   o += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:18px">';
-  [{l:'Total',v:reservas.length,c:'var(--text)'},{l:'Realizadas',v:reservas.filter(function(r){return r.status==='realizada';}).length,c:'#4D9EFF'},{l:'Gasto total',v:'R$ '+reservas.reduce(function(s,r){return s+r.preco;},0),c:'#00F082'}].forEach(function(s){
+  [
+    {l:'Total',v:campos.length + torneios.length,c:'var(--text)'},
+    {l:'Reservas',v:campos.length,c:'var(--teal)'},
+    {l:'Gasto total',v:'R$ '+totalGasto.toFixed(2).replace('.',','),c:'var(--green)'}
+  ].forEach(function(s){
     o += '<div class="scard"><div style="color:' + s.c + ';font-weight:900;font-size:15px">' + s.v + '</div><div class="slbl">' + s.l + '</div></div>';
   });
   o += '</div>';
-  reservas.forEach(function(r) {
-    var cor = sCor[r.status];
+  
+  // Abas
+  o += '<div style="display:flex;gap:6px;margin-bottom:13px">';
+  [
+    ['campos','🏟️ Campos',campos.length],
+    ['torneios','🏆 Torneios',torneios.length]
+  ].forEach(function(a){
+    var act = S.resAba === a[0];
+    o += '<button onclick="S.resAba=\''+a[0]+'\';render()" style="flex:1;padding:9px 12px;border-radius:12px;font-size:13px;font-weight:700;border:1.5px solid '+(act?'var(--green)':'var(--bord)')+';background:'+(act?'rgba(0,240,130,.12)':'var(--surf)')+';color:'+(act?'var(--green)':'var(--text2)')+';cursor:pointer">'+a[1]+(a[2]?' <span style="background:'+(act?'var(--green)':'var(--bord)')+';color:'+(act?'var(--bg)':'var(--text2)')+';padding:1px 8px;border-radius:99px;font-size:11px;margin-left:4px">'+a[2]+'</span>':'')+'</button>';
+  });
+  o += '</div>';
+  
+  // Conteúdo da aba
+  var lista = S.resAba === 'campos' ? campos : torneios;
+  
+  if (lista.length === 0) {
+    o += '<div style="text-align:center;padding:50px 20px">';
+    o += '<div style="font-size:52px;margin-bottom:14px">'+(S.resAba==='campos'?'🏟️':'🏆')+'</div>';
+    o += '<div style="font-weight:800;font-size:16px;margin-bottom:8px">Nenhuma '+(S.resAba==='campos'?'reserva':'inscrição')+' ainda</div>';
+    o += '<div style="color:var(--muted);font-size:13px;margin-bottom:18px">'+(S.resAba==='campos'?'Reserve um campo e seu pagamento confirmado aparecerá aqui.':'Inscreva-se em um torneio e a confirmação aparecerá aqui.')+'</div>';
+    o += '<button class="btn bp" onclick="go(\''+(S.resAba==='campos'?'campos':'torneios')+'\')">'+(S.resAba==='campos'?'⚽ Ver campos':'🏆 Ver torneios')+'</button>';
+    o += '</div></div>';
+    return o;
+  }
+  
+  // Render lista
+  lista.forEach(function(r) {
     o += '<div class="card" style="margin-bottom:9px;padding:13px 14px">';
     o += '<div style="display:flex;align-items:center;gap:11px;margin-bottom:9px">';
-    o += '<div style="width:44px;height:44px;border-radius:12px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:22px">' + r.img + '</div>';
-    o += '<div style="flex:1"><div style="font-weight:700;font-size:14px">' + esc(r.campo) + '</div>';
-    o += '<div style="color:var(--muted);font-size:12px;margin-top:2px">📅 ' + r.data + ' · ' + r.hora + '</div></div>';
-    o += pl(sLbl[r.status], cor) + '</div>';
+    o += '<div style="width:44px;height:44px;border-radius:12px;background:var(--surf);border:1px solid var(--bord);display:flex;align-items:center;justify-content:center;font-size:22px">' + (S.resAba==='campos'?'⚽':'🏆') + '</div>';
+    o += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">' + esc(r.nome||'—') + '</div>';
+    if (r.endereco) {
+      o += '<div style="color:var(--muted);font-size:11px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📍 ' + esc(r.endereco) + '</div>';
+    }
+    if (r.data) {
+      o += '<div style="color:var(--muted);font-size:12px;margin-top:3px">📅 ' + esc(r.data) + (r.hora?' · '+esc(r.hora):'') + '</div>';
+    }
+    o += '</div>';
+    o += pl('✅ Pago','#00F082') + '</div>';
     o += '<div style="display:flex;justify-content:space-between;align-items:center;padding-top:9px;border-top:1px solid var(--bord)">';
-    o += '<div style="display:flex;gap:14px"><span style="font-size:12px;color:var(--muted)">💰 R$ ' + r.preco + '</span><span style="font-size:12px;color:var(--muted)">👥 ' + r.jog + ' jogadores</span></div>';
-    o += '<span style="font-size:12px;color:var(--muted)">R$ ' + (r.preco/r.jog).toFixed(2) + '/jog.</span></div>';
-    if (r.status === 'realizada') {
-      o += '<button class="btn bs bsm" style="width:100%;margin-top:9px" onclick="toast(\'Reserva repetida! 📅\')">🔁 Repetir reserva</button>';
-    } else if (r.status === 'confirmada') {
-      o += '<div style="display:flex;gap:7px;margin-top:9px">';
-      o += '<button class="btn bs bsm" style="flex:1" onclick="toast(\'Link copiado! 🔗\')">📤 Compartilhar</button>';
-      o += '<button class="btn bd bsm" style="flex:1" onclick="toast(\'Reserva cancelada.\')">Cancelar</button></div>';
+    o += '<div><span style="font-size:12px;color:var(--muted)">💰 Valor pago</span><div style="font-weight:900;color:var(--green);font-size:16px">R$ '+Number(r.valor||0).toFixed(2).replace('.',',')+'</div></div>';
+    o += '<div style="text-align:right"><span style="font-size:11px;color:var(--muted)">Pago em</span><div style="font-size:11px;color:var(--text2)">'+(r.criadoEm?_fmtData(r.criadoEm):'-')+'</div></div>';
+    o += '</div>';
+    if (r.dono) {
+      o += '<div style="margin-top:9px;padding-top:9px;border-top:1px dashed var(--bord);font-size:11px;color:var(--muted)">🏠 Dono: '+esc(r.dono)+'</div>';
     }
     o += '</div>';
   });
+  
   o += '</div>';
   return o;
+}
+
+// Helper: formatar data/hora
+function _fmtData(ts){
+  if(!ts) return '-';
+  var d = new Date(ts);
+  var dia = String(d.getDate()).padStart(2,'0');
+  var mes = String(d.getMonth()+1).padStart(2,'0');
+  var hora = String(d.getHours()).padStart(2,'0');
+  var min = String(d.getMinutes()).padStart(2,'0');
+  return dia+'/'+mes+' '+hora+':'+min;
+}
+
+// Carregar reservas do usuário do Firestore
+function _carregarMinhasReservas(){
+  if (!S.fbUser || !_fbDb) return;
+  S.resCarregando = true;
+  render();
+  
+  _fbDb.collection('pagamentos')
+    .where('jogadorUid','==',S.fbUser.uid)
+    .where('status','==','AUTHORIZED')
+    .get()
+    .then(function(snap){
+      var campos = [];
+      var torneios = [];
+      snap.forEach(function(d){
+        var p = d.data();
+        var item = {
+          id: d.id,
+          valor: p.valor || 0,
+          criadoEm: p.criadoEm && p.criadoEm.toMillis ? p.criadoEm.toMillis() : null
+        };
+        if (p.tipo === 'reserva_campo') {
+          item.nome = p.campoNome || 'Campo';
+          item.endereco = p.campoEndereco || '';
+          item.data = p.reservaData || '';
+          item.hora = p.reservaHora || '';
+          item.dono = p.donoNome || '';
+          campos.push(item);
+        } else if (p.tipo === 'inscricao_torneio') {
+          item.nome = p.torneioNome || 'Torneio';
+          item.data = p.torneioData || '';
+          torneios.push(item);
+        }
+      });
+      // Ordenar por data mais recente
+      var byData = function(a,b){ return (b.criadoEm||0) - (a.criadoEm||0); };
+      campos.sort(byData);
+      torneios.sort(byData);
+      S.resData = { campos: campos, torneios: torneios };
+      S.resCarregando = false;
+      render();
+    })
+    .catch(function(e){
+      S.resCarregando = false;
+      S.resData = { campos: [], torneios: [] };
+      toast('Erro ao carregar: ' + e.code);
+      console.error('Erro minhas reservas:', e);
+      render();
+    });
 }
 
 /* ── RATING INTERATIVO DE CAMPO ─────────────────── */
