@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>FutStory · Admin</title>
+<style>
+:root{--bg:#07090F;--card:#0F1218;--surf:#151922;--bord:#1F2531;--text:#E8ECF3;--text2:#A0A8B8;--muted:#6A7385;--green:#00F082;--teal:#00C4AA;--yellow:#FFBE00;--pink:#FF4D8D;--red:#FF4040;--blue:#4D9EFF}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+a{color:var(--green);text-decoration:none}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--bord);background:var(--card)}
+.logo{font-size:18px;font-weight:900}
+.logo .g{color:var(--green)} .logo .o{color:var(--yellow)}
+.logo .adm{margin-left:10px;font-size:12px;color:var(--pink);font-weight:700;padding:3px 9px;background:rgba(255,77,141,.15);border-radius:99px}
+.btn{background:var(--green);color:var(--bg);border:none;padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px}
+.btn:hover{opacity:.9}
+.btn.sec{background:var(--surf);color:var(--text);border:1px solid var(--bord)}
+.btn.dgr{background:var(--red);color:#fff}
+.btn.sml{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px}
+.stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;font-weight:700;letter-spacing:.5px}
+.stat-val{font-size:26px;font-weight:900}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:4px}
+.green{color:var(--green)} .red{color:var(--red)} .yellow{color:var(--yellow)} .blue{color:var(--blue)}
+.tabs{display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.tab{padding:8px 16px;border-radius:99px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid var(--bord);background:var(--surf);color:var(--text2);white-space:nowrap}
+.tab.act{border-color:var(--green);background:rgba(0,240,130,.12);color:var(--green)}
+.tab .bd{display:inline-block;margin-left:6px;background:var(--green);color:var(--bg);border-radius:99px;padding:1px 8px;font-size:11px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filter{background:var(--surf);border:1px solid var(--bord);padding:6px 12px;border-radius:8px;color:var(--text);font-size:13px;outline:none}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}
+th{text-align:left;padding:11px 13px;background:var(--surf);font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--bord)}
+td{padding:13px;font-size:13px;border-bottom:1px solid var(--bord);vertical-align:top}
+tr:hover td{background:var(--surf)}
+tr:last-child td{border-bottom:none}
+.pix{font-family:monospace;font-size:11px;color:var(--green);background:rgba(0,240,130,.08);padding:3px 7px;border-radius:5px;cursor:copy;display:inline-block;border:1px dashed rgba(0,240,130,.3)}
+.tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px}
+.tag.ok{background:rgba(0,240,130,.15);color:var(--green)}
+.tag.p{background:rgba(255,190,0,.15);color:var(--yellow)}
+.tag.t{background:rgba(77,158,255,.15);color:var(--blue)}
+.tag.c{background:rgba(0,196,170,.15);color:var(--teal)}
+.login-box{max-width:400px;margin:80px auto;padding:30px;background:var(--card);border:1px solid var(--bord);border-radius:16px;text-align:center}
+.login-box h2{margin-bottom:8px;font-size:22px}
+.login-box p{color:var(--text2);font-size:13px;margin-bottom:22px}
+.login-box input{width:100%;padding:11px 13px;margin-bottom:11px;background:var(--surf);border:1.5px solid var(--bord);border-radius:10px;color:var(--text);font-size:14px;outline:none}
+.login-box input:focus{border-color:var(--green)}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--bord);padding:12px 22px;border-radius:99px;font-size:13px;z-index:999;box-shadow:0 10px 40px rgba(0,0,0,.4);display:none}
+.toast.err{border-color:var(--red);color:var(--red)}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty .ic{font-size:60px;margin-bottom:14px;display:block}
+.dono-card{background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:11px}
+.dono-card .d-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.dono-card .d-nome{font-weight:800;font-size:15px}
+.dono-card .d-tot{font-weight:900;color:var(--green);font-size:18px}
+.dono-card .d-info{color:var(--text2);font-size:12px;margin-bottom:9px}
+.err-box{background:rgba(255,64,64,.1);border:1px solid rgba(255,64,64,.3);padding:14px;border-radius:10px;color:#FF8080;margin-bottom:14px}
+.loading{text-align:center;padding:40px;color:var(--muted)}
+.spinner{display:inline-block;width:18px;height:18px;border:2.5px solid var(--bord);border-top-color:var(--green);border-radius:50%;animation:spin 1s linear infinite;margin-right:9px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.chk{width:16px;height:16px;cursor:pointer}
+.multi-actions{position:sticky;bottom:0;background:var(--card);border:1px solid var(--green);border-radius:12px;padding:12px 16px;margin-top:14px;display:flex;align-items:center;gap:11px;box-shadow:0 -10px 30px rgba(0,0,0,.3)}
+.multi-actions .count{font-weight:800;color:var(--green)}
+.chart{background:var(--card);border:1px solid var(--bord);border-radius:12px;padding:16px;margin-bottom:16px}
+.chart-title{font-weight:800;margin-bottom:13px;font-size:15px}
+.bar-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.bar-lbl{width:100px;font-size:12px;color:var(--text2)}
+.bar-wrap{flex:1;height:22px;background:var(--surf);border-radius:6px;overflow:hidden;position:relative}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--teal));border-radius:6px}
+.bar-val{width:80px;text-align:right;font-weight:800;font-size:13px}
+.csv-btn{float:right}
+@media (max-width:700px){
+  .container{padding:10px}
+  table{font-size:11px}
+  th,td{padding:9px 6px}
+  .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo"><span class="g">Fut</span><span class="o">Story</span> <span class="adm">⚙ ADMIN</span></div>
+  <div id="user-info"></div>
+</div>
+
+<div class="container" id="app">
+  <div class="loading"><span class="spinner"></span> Carregando...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<script>
+// Config Firebase (mesmo projeto)
+var firebaseConfig = {
+  apiKey:"AIzaSyBwfyvI8M13sCnBOsu6YvX7nd4RHkppKKk",
+  authDomain:"arenahub-e3fef.firebaseapp.com",
+  projectId:"arenahub-e3fef",
+  storageBucket:"arenahub-e3fef.firebasestorage.app",
+  messagingSenderId:"1074080290538",
+  appId:"1:1074080290538:web:5a0e9b1c03be99aae55d72"
+};
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+
+var API_BACKEND = 'https://futstory-backend.vercel.app';
+var ADMIN_EMAILS = ['khristianowalks@gmail.com','soulprimebank@gmail.com'];
+
+var S = {
+  user: null,
+  idToken: null,
+  data: null,
+  tab: 'pendentes', // 'pendentes' | 'repassados' | 'donos' | 'graficos'
+  selecionados: new Set()
+};
+
+function toast(msg, tipo){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (tipo||'ok');
+  t.style.display = 'block';
+  setTimeout(function(){ t.style.display = 'none'; }, 3000);
+}
+
+function esc(s){
+  if(s==null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtMoeda(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.',','); }
+
+function fmtData(ts){
+  if(!ts) return '-';
+  var d = new Date(ts);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function fmtTipo(t){
+  if(t==='reserva_campo') return '<span class="tag c">Campo</span>';
+  if(t==='inscricao_torneio') return '<span class="tag t">Torneio</span>';
+  return t;
+}
+
+// ============ LOGIN ============
+function renderLogin(err){
+  document.getElementById('app').innerHTML = 
+    '<div class="login-box">' +
+    '<h2>🔐 Área Administrativa</h2>' +
+    '<p>Faça login com sua conta admin autorizada</p>' +
+    (err ? '<div class="err-box">' + esc(err) + '</div>' : '') +
+    '<input id="adm-email" type="email" placeholder="Email admin" value="" autocomplete="email" />' +
+    '<input id="adm-senha" type="password" placeholder="Senha" autocomplete="current-password" />' +
+    '<button class="btn" style="width:100%;padding:13px;margin-top:4px" onclick="fazerLogin()">Entrar</button>' +
+    '<button class="btn sec" style="width:100%;padding:13px;margin-top:9px" onclick="loginGoogle()">Entrar com Google</button>' +
+    '<p style="margin-top:18px;font-size:11px">Apenas contas autorizadas podem acessar.</p>' +
+    '</div>';
+}
+
+function fazerLogin(){
+  var email = document.getElementById('adm-email').value.trim();
+  var senha = document.getElementById('adm-senha').value;
+  if(!email||!senha){ toast('Preencha email e senha','err'); return; }
+  auth.signInWithEmailAndPassword(email, senha)
+    .catch(function(e){
+      var msg = 'Falha no login';
+      if(e.code==='auth/wrong-password'||e.code==='auth/invalid-credential') msg='Senha incorreta';
+      if(e.code==='auth/user-not-found') msg='Email não cadastrado';
+      if(e.code==='auth/invalid-email') msg='Email inválido';
+      renderLogin(msg);
+    });
+}
+
+function loginGoogle(){
+  var p = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(p).catch(function(e){
+    renderLogin('Falha Google: '+e.message);
+  });
+}
+
+function logout(){
+  auth.signOut().then(function(){ location.reload(); });
+}
+
+// ============ CARREGAR DADOS ============
+async function carregarDados(){
+  if(!S.idToken) return;
+  document.getElementById('app').innerHTML = '<div class="loading"><span class="spinner"></span> Carregando pagamentos...</div>';
+  try {
+    var repassado = S.tab==='repassados' ? 'true' : (S.tab==='pendentes' ? 'false' : 'all');
+    var resp = await fetch(API_BACKEND + '/api/admin-listar?repassado=' + repassado, {
+      headers: { 'Authorization': 'Bearer ' + S.idToken }
+    });
+    var data = await resp.json();
+    if(!resp.ok){
+      if(resp.status===403){
+        document.getElementById('app').innerHTML = 
+          '<div class="err-box" style="max-width:500px;margin:60px auto">' +
+          '<strong>Acesso negado</strong><br>' +
+          'Sua conta <code>' + esc(S.user.email) + '</code> não está autorizada como admin.<br><br>' +
+          '<button class="btn sml" onclick="logout()">Sair</button>' +
+          '</div>';
+        return;
+      }
+      throw new Error(data.erro || 'Erro ' + resp.status);
+    }
+    S.data = data;
+    S.selecionados.clear();
+    renderDashboard();
+  } catch(e) {
+    document.getElementById('app').innerHTML = 
+      '<div class="err-box">Erro ao carregar: ' + esc(e.message) + '<br><button class="btn sml" onclick="carregarDados()">Tentar novamente</button></div>';
+  }
+}
+
+// ============ RENDER DASHBOARD ============
+function renderDashboard(){
+  var d = S.data;
+  var pendentes = d.pagamentos.filter(p => !p.repassado);
+  var repassados = d.pagamentos.filter(p => p.repassado);
+  
+  var o = '';
+  
+  // Stats
+  o += '<div class="stats">';
+  o += '<div class="stat"><div class="stat-lbl">Total Arrecadado</div><div class="stat-val green">'+fmtMoeda(d.totalValor)+'</div><div class="stat-sub">' + d.total + ' pagamentos</div></div>';
+  o += '<div class="stat"><div class="stat-lbl">A Repassar</div><div class="stat-val yellow">'+fmtMoeda(d.totalPendente)+'</div><div class="stat-sub">' + pendentes.length + ' pagamentos</div></div>';
+  o += '<div class="stat"><div class="stat-lbl">Já Repassado</div><div class="stat-val blue">'+fmtMoeda(d.totalRepassado)+'</div><div class="stat-sub">' + repassados.length + ' pagamentos</div></div>';
+  o += '<div class="stat"><div class="stat-lbl">Donos Únicos</div><div class="stat-val">'+d.porDono.length+'</div><div class="stat-sub">com pendências</div></div>';
+  o += '</div>';
+  
+  // Tabs
+  o += '<div class="tabs">';
+  [
+    ['pendentes','💰 A repassar', pendentes.length],
+    ['repassados','✅ Repassados', S.tab==='repassados' ? d.pagamentos.length : '-'],
+    ['donos','👥 Por Dono', d.porDono.length],
+    ['graficos','📊 Gráficos', '']
+  ].forEach(function(t){
+    o += '<div class="tab '+(S.tab===t[0]?'act':'')+'" onclick="S.tab=\''+t[0]+'\';carregarDados()">'+t[1];
+    if(t[2]!=='-'&&t[2]!=='') o += ' <span class="bd">'+t[2]+'</span>';
+    o += '</div>';
+  });
+  o += '</div>';
+  
+  // Conteúdo por tab
+  if(S.tab==='pendentes') o += renderListaPagamentos(pendentes, true);
+  else if(S.tab==='repassados') o += renderListaPagamentos(S.data.pagamentos, false);
+  else if(S.tab==='donos') o += renderDonos(d.porDono);
+  else if(S.tab==='graficos') o += renderGraficos(d);
+  
+  document.getElementById('app').innerHTML = o;
+}
+
+function renderListaPagamentos(lista, podeMarcar){
+  if(!lista || lista.length===0){
+    return '<div class="empty"><span class="ic">🌴</span>Nenhum pagamento aqui</div>';
+  }
+  var o = '<button class="btn sml sec csv-btn" onclick="exportarCSV()">📥 Exportar CSV</button>';
+  o += '<div style="clear:both"></div>';
+  o += '<div style="overflow-x:auto;border-radius:12px;border:1px solid var(--bord)">';
+  o += '<table>';
+  o += '<thead><tr>';
+  if(podeMarcar) o += '<th style="width:30px"><input type="checkbox" onclick="togglTodos(this)" class="chk"></th>';
+  o += '<th>Data</th><th>Tipo</th><th>Valor</th><th>Jogador</th><th class="hide-sm">Campo</th><th class="hide-sm">Dono</th><th class="hide-sm">PIX</th><th>Ações</th>';
+  o += '</tr></thead><tbody>';
+  
+  lista.forEach(function(p){
+    var isTorn = p.tipo === 'inscricao_torneio';
+    o += '<tr id="row-'+p.transactionId+'">';
+    if(podeMarcar) o += '<td><input type="checkbox" class="chk chk-item" data-tx="'+p.transactionId+'" onclick="toggleSel(this)"></td>';
+    o += '<td>'+fmtData(p.criadoEm)+'</td>';
+    o += '<td>'+fmtTipo(p.tipo)+'</td>';
+    o += '<td><strong class="green">'+fmtMoeda(p.valor)+'</strong></td>';
+    o += '<td>'+esc(p.jogadorNome||'-')+'<br><small style="color:var(--muted)">'+esc(p.jogadorEmail||'')+'</small></td>';
+    o += '<td class="hide-sm">'+esc(isTorn ? p.torneioNome||'-' : p.campoNome||'-');
+    if(!isTorn && p.reservaData) o += '<br><small style="color:var(--muted)">'+esc(p.reservaData)+' '+esc(p.reservaHora||'')+'</small>';
+    o += '</td>';
+    o += '<td class="hide-sm">'+esc(p.donoNome||'-')+'</td>';
+    o += '<td class="hide-sm">';
+    if(p.donoChavePix){
+      o += '<span class="pix" onclick="copiarPix(\''+p.donoChavePix.replace(/'/g,"\\'")+'\')" title="Clique para copiar">'+esc(p.donoChavePix)+'</span>';
+      o += '<br><small style="color:var(--muted)">'+esc(p.donoTipoPix||'')+'</small>';
+    } else { o += '<small style="color:var(--muted)">sem chave</small>'; }
+    o += '</td>';
+    o += '<td>';
+    if(p.repassado){
+      o += '<span class="tag ok">✓ Repassado</span><br>';
+      o += '<small style="color:var(--muted)">'+fmtData(p.repassadoEm)+'</small><br>';
+      o += '<button class="btn sml sec" onclick="marcarUm(\''+p.transactionId+'\',false)" style="margin-top:4px">Desmarcar</button>';
+    } else {
+      o += '<button class="btn sml" onclick="marcarUm(\''+p.transactionId+'\',true)">Marcar pago</button>';
+      o += '<br><button class="btn sml dgr" onclick="deletarUm(\''+p.transactionId+'\')" style="margin-top:4px">🗑</button>';
+    }
+    o += '</td></tr>';
+  });
+  o += '</tbody></table></div>';
+  
+  // Multi actions
+  o += '<div id="multi-actions" style="display:none"></div>';
+  
+  return o;
+}
+
+function renderDonos(donos){
+  if(!donos || donos.length===0){
+    return '<div class="empty"><span class="ic">👥</span>Nenhum dono com pagamentos pendentes</div>';
+  }
+  var o = '<div>';
+  donos.forEach(function(d){
+    o += '<div class="dono-card">';
+    o += '<div class="d-top">';
+    o += '<div>';
+    o += '<div class="d-nome">'+esc(d.donoNome||'(Sem nome)')+'</div>';
+    o += '<div class="d-info">'+d.quantidade+' pagamento'+(d.quantidade!==1?'s':'')+' pendente'+(d.quantidade!==1?'s':'')+'</div>';
+    o += '</div>';
+    o += '<div class="d-tot">'+fmtMoeda(d.total)+'</div>';
+    o += '</div>';
+    if(d.donoChavePix){
+      o += '<div style="margin-bottom:9px"><strong>PIX:</strong> <span class="pix" onclick="copiarPix(\''+d.donoChavePix.replace(/'/g,"\\'")+'\')">'+esc(d.donoChavePix)+'</span> <small style="color:var(--muted)">('+esc(d.donoTipoPix||'')+')</small></div>';
+    }
+    o += '<button class="btn sml" onclick="marcarVarios('+JSON.stringify(d.pagamentos).replace(/"/g,'&quot;')+',true)">✓ Marcar todos '+d.quantidade+' como repassados</button>';
+    o += '</div>';
+  });
+  o += '</div>';
+  return o;
+}
+
+function renderGraficos(d){
+  // Receita por dono
+  var o = '<div class="chart">';
+  o += '<div class="chart-title">💰 Valor a repassar por dono</div>';
+  if(d.porDono.length===0){
+    o += '<div class="empty">Sem dados</div>';
+  } else {
+    var max = Math.max.apply(null, d.porDono.map(x=>x.total));
+    d.porDono.slice(0,10).forEach(function(x){
+      var pct = Math.max(2, (x.total/max)*100);
+      o += '<div class="bar-row">';
+      o += '<div class="bar-lbl">'+esc((x.donoNome||'Sem dono').substring(0,15))+'</div>';
+      o += '<div class="bar-wrap"><div class="bar-fill" style="width:'+pct+'%"></div></div>';
+      o += '<div class="bar-val">'+fmtMoeda(x.total)+'</div>';
+      o += '</div>';
+    });
+  }
+  o += '</div>';
+  
+  // Receita por tipo
+  var totalCampo = d.pagamentos.filter(p=>p.tipo==='reserva_campo').reduce((s,p)=>s+Number(p.valor||0),0);
+  var totalTorn = d.pagamentos.filter(p=>p.tipo==='inscricao_torneio').reduce((s,p)=>s+Number(p.valor||0),0);
+  var totalGeral = totalCampo + totalTorn;
+  
+  o += '<div class="chart">';
+  o += '<div class="chart-title">📊 Receita por tipo</div>';
+  if(totalGeral===0){
+    o += '<div class="empty">Sem dados</div>';
+  } else {
+    o += '<div class="bar-row">';
+    o += '<div class="bar-lbl">Campos</div>';
+    o += '<div class="bar-wrap"><div class="bar-fill" style="width:'+((totalCampo/totalGeral)*100)+'%"></div></div>';
+    o += '<div class="bar-val">'+fmtMoeda(totalCampo)+'</div>';
+    o += '</div>';
+    o += '<div class="bar-row">';
+    o += '<div class="bar-lbl">Torneios</div>';
+    o += '<div class="bar-wrap"><div class="bar-fill" style="width:'+((totalTorn/totalGeral)*100)+'%;background:linear-gradient(90deg,var(--blue),#7A5AF8)"></div></div>';
+    o += '<div class="bar-val">'+fmtMoeda(totalTorn)+'</div>';
+    o += '</div>';
+  }
+  o += '</div>';
+  
+  return o;
+}
+
+// ============ AÇÕES ============
+function togglTodos(chk){
+  document.querySelectorAll('.chk-item').forEach(function(c){
+    c.checked = chk.checked;
+    if(chk.checked) S.selecionados.add(c.dataset.tx);
+    else S.selecionados.delete(c.dataset.tx);
+  });
+  renderMultiActions();
+}
+
+function toggleSel(chk){
+  if(chk.checked) S.selecionados.add(chk.dataset.tx);
+  else S.selecionados.delete(chk.dataset.tx);
+  renderMultiActions();
+}
+
+function renderMultiActions(){
+  var box = document.getElementById('multi-actions');
+  if(!box) return;
+  if(S.selecionados.size===0){ box.style.display='none'; return; }
+  box.style.display = 'flex';
+  box.className = 'multi-actions';
+  box.innerHTML = '<span class="count">'+S.selecionados.size+'</span> selecionados' +
+    '<button class="btn sml" onclick="marcarSelecionados(true)">✓ Marcar como repassados</button>' +
+    '<button class="btn sml sec" onclick="marcarSelecionados(false)">Desmarcar</button>' +
+    '<button class="btn sml dgr" onclick="deletarSelecionados()">🗑 Deletar</button>';
+}
+
+async function marcarUm(txId, repassado){
+  await marcarVarios([txId], repassado);
+}
+
+async function marcarVarios(txIds, repassado){
+  if(!confirm('Tem certeza? Isso vai ' + (repassado ? 'marcar como repassado' : 'desmarcar') + ' ' + txIds.length + ' pagamento(s).')) return;
+  try {
+    var resp = await fetch(API_BACKEND + '/api/admin-marcar', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + S.idToken
+      },
+      body: JSON.stringify({ transactionIds: txIds, repassado: repassado })
+    });
+    var data = await resp.json();
+    if(!resp.ok) throw new Error(data.erro||'Erro');
+    toast('✅ ' + data.processados + ' pagamento(s) atualizado(s)','ok');
+    await carregarDados();
+  } catch(e) {
+    toast('❌ ' + e.message,'err');
+  }
+}
+
+async function marcarSelecionados(repassado){
+  var ids = Array.from(S.selecionados);
+  await marcarVarios(ids, repassado);
+}
+
+async function deletarUm(txId){
+  if(!confirm('DELETAR este pagamento? Essa ação não pode ser desfeita.')) return;
+  try {
+    var resp = await fetch(API_BACKEND + '/api/admin-marcar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json','Authorization': 'Bearer ' + S.idToken},
+      body: JSON.stringify({ transactionIds: [txId], deletar: true })
+    });
+    var data = await resp.json();
+    if(!resp.ok) throw new Error(data.erro||'Erro');
+    toast('🗑 Pagamento deletado','ok');
+    await carregarDados();
+  } catch(e) {
+    toast('❌ ' + e.message,'err');
+  }
+}
+
+async function deletarSelecionados(){
+  var ids = Array.from(S.selecionados);
+  if(!confirm('DELETAR ' + ids.length + ' pagamento(s)? Essa ação não pode ser desfeita.')) return;
+  try {
+    var resp = await fetch(API_BACKEND + '/api/admin-marcar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json','Authorization': 'Bearer ' + S.idToken},
+      body: JSON.stringify({ transactionIds: ids, deletar: true })
+    });
+    var data = await resp.json();
+    if(!resp.ok) throw new Error(data.erro||'Erro');
+    toast('🗑 ' + data.processados + ' deletado(s)','ok');
+    await carregarDados();
+  } catch(e) {
+    toast('❌ ' + e.message,'err');
+  }
+}
+
+function copiarPix(v){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(v).then(function(){ toast('PIX copiado! 📋','ok'); });
+  } else {
+    var ta=document.createElement('textarea'); ta.value=v;
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('PIX copiado!','ok'); }catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+
+function exportarCSV(){
+  if(!S.data||!S.data.pagamentos) return;
+  var linhas = [['Data','Tipo','Valor','Jogador','Email Jogador','Campo/Torneio','Data Reserva','Hora Reserva','Dono','PIX Dono','Tipo PIX','Repassado','Data Repasse','Transaction ID'].join(',')];
+  S.data.pagamentos.forEach(function(p){
+    linhas.push([
+      fmtData(p.criadoEm),
+      p.tipo,
+      (p.valor||0).toFixed(2),
+      '"'+(p.jogadorNome||'').replace(/"/g,"'")+'"',
+      p.jogadorEmail||'',
+      '"'+((p.tipo==='inscricao_torneio'?p.torneioNome:p.campoNome)||'').replace(/"/g,"'")+'"',
+      p.reservaData||'',
+      p.reservaHora||'',
+      '"'+(p.donoNome||'').replace(/"/g,"'")+'"',
+      p.donoChavePix||'',
+      p.donoTipoPix||'',
+      p.repassado?'Sim':'Não',
+      p.repassadoEm?fmtData(p.repassadoEm):'',
+      p.transactionId
+    ].join(','));
+  });
+  var csv = '\uFEFF' + linhas.join('\n'); // BOM pra Excel abrir com UTF-8
+  var blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'futstory-pagamentos-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV baixado! 📥','ok');
+}
+
+// ============ AUTH FLOW ============
+auth.onAuthStateChanged(async function(user){
+  if(!user){
+    S.user = null;
+    S.idToken = null;
+    document.getElementById('user-info').innerHTML = '';
+    renderLogin();
+    return;
+  }
+  S.user = user;
+  // Validação client-side (depois o backend valida de novo com ID Token)
+  if(!ADMIN_EMAILS.map(e=>e.toLowerCase()).includes((user.email||'').toLowerCase())){
+    document.getElementById('user-info').innerHTML = 
+      '<small style="color:var(--red)">❌ '+esc(user.email)+'</small> ' +
+      '<button class="btn sml sec" onclick="logout()">Sair</button>';
+    document.getElementById('app').innerHTML = 
+      '<div class="err-box" style="max-width:500px;margin:60px auto">' +
+      '<strong>Acesso negado</strong><br>' +
+      'A conta <code>'+esc(user.email)+'</code> não é admin.<br><br>' +
+      'Entre com uma conta autorizada.' +
+      '</div>';
+    return;
+  }
+  // OK: carregar token e dados
+  try {
+    S.idToken = await user.getIdToken();
+    document.getElementById('user-info').innerHTML = 
+      '<small style="color:var(--green)">✓ '+esc(user.email)+'</small> ' +
+      '<button class="btn sml sec" onclick="logout()">Sair</button>';
+    await carregarDados();
+    // Renovar token a cada 30 minutos
+    setInterval(async function(){
+      if(auth.currentUser) S.idToken = await auth.currentUser.getIdToken(true);
+    }, 30*60*1000);
+  } catch(e) {
+    renderLogin('Erro de autenticação: '+e.message);
+  }
+});
+</script>
+
+</body>
+</html>
