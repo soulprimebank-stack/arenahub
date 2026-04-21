@@ -1451,7 +1451,8 @@ function _criarPagamento(dados, callback){
       valor: dados.valor,
       descricao: dados.descricao,
       cliente: dados.cliente,
-      uidUsuario: S.fbUser.uid
+      uidUsuario: S.fbUser.uid,
+      metadata: dados.metadata || null
     })
   }).then(function(r){return r.json();})
     .then(function(resp){
@@ -2000,6 +2001,22 @@ function _gerarPixCampo(){
       email: S.perfEmail||'',
       cpf: cpf,
       telefone: '+55'+tel
+    },
+    // Rastreabilidade completa
+    metadata:{
+      campoId: S.cSel.id,
+      campoNome: S.cSel.nome,
+      campoEndereco: S.cSel.enderecoCompleto||S.cSel.end||'',
+      donoUid: S.cSel.donoUid||null,
+      donoNome: S.cSel.donoNome||null,
+      donoChavePix: S.cSel.chavePix||null,
+      donoTipoPix: S.cSel.tipoChavePix||null,
+      jogadorUid: S.fbUser.uid,
+      jogadorNome: S.perfNome||'Jogador',
+      jogadorEmail: S.perfEmail||'',
+      reservaData: S.reservaData||'',
+      reservaHora: S.reservaHora||'',
+      reservaHoraFim: S.horSel?S.horSel.hora.split(' – ')[1]||'':''
     }
   },function(erro,resp){
     if(btn){btn.disabled=false;btn.innerHTML='Gerar PIX';}
@@ -2079,6 +2096,16 @@ function _gerarPixTorn(){
       email: S.perfEmail||'',
       cpf: cpf,
       telefone: '+55'+tel
+    },
+    metadata:{
+      torneioId: S.tornSel.id,
+      torneioNome: S.tornSel.nome,
+      torneioCampo: S.tornSel.campo||'',
+      torneioData: S.tornSel.data||'',
+      criadorUid: S.tornSel.criadoPor||null,
+      jogadorUid: S.fbUser.uid,
+      jogadorNome: S.perfNome||'Jogador',
+      jogadorEmail: S.perfEmail||''
     }
   },function(erro,resp){
     if(btn){btn.disabled=false;btn.innerHTML='Gerar PIX';}
@@ -3789,22 +3816,191 @@ function screenCampoConfirmado(){
   return o;
 }
 function screenCadastrarCampo(){
-  var o='<div class="fu" style="padding:14px 14px">'+bb('S.cCadastr=false;render()');
-  o+='<h3 style="font-weight:900;font-size:19px;margin:0 0 18px">🏟️ Cadastrar Campo</h3>';
-  o+='<div class="fg"><label class="fl">Nome do campo</label><input class="fi" placeholder="Ex: Arena Verde"></div>';
-  o+='<div class="fg"><label class="fl">Endereço</label><input class="fi" placeholder="Rua, número..."></div>';
-  o+='<div class="fg"><label class="fl">Cidade</label><input class="fi" placeholder="Ex: Goiânia"></div>';
-  o+='<div class="fg"><label class="fl">Preço por hora (R$)</label><input class="fi" type="number" placeholder="Ex: 120"></div>';
-  o+='<div class="card" style="margin-bottom:13px"><div class="fl" style="margin-bottom:11px">📷 Fotos do estabelecimento</div>';
-  o+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px">'+[0,1,2].map(function(){return'<div style="aspect-ratio:1/1;border:2px dashed var(--bord);border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer"><span style="font-size:22px">📷</span><span style="color:var(--muted);font-size:10px">+ Foto</span></div>';}).join('')+'</div></div>';
-  o+='<div class="card" style="margin-bottom:13px"><div class="fl" style="margin-bottom:11px">🎬 Vídeos do campo</div>';
-  o+='<div style="border:2px dashed var(--bord);border-radius:11px;padding:18px 14px;text-align:center;cursor:pointer"><div style="font-size:30px;margin-bottom:5px">🎬</div><div style="font-weight:700;font-size:13px;margin-bottom:2px">Adicionar vídeo</div><div style="color:var(--muted);font-size:11px">MP4, MOV · Máx. 500MB</div></div></div>';
-  o+='<div class="card" style="margin-bottom:15px;border-color:rgba(255,77,141,.22)"><div style="color:var(--pink);font-size:11px;font-weight:800;margin-bottom:11px;text-transform:uppercase">🔥 Adicionar Promoção</div>';
-  o+='<div class="fg"><label class="fl">Descrição da oferta</label><input class="fi" placeholder="Ex: 20% OFF nas terças"></div>';
-  o+='<div class="fg" style="margin:0"><label class="fl">Válido até</label><input class="fi" placeholder="Ex: 31/03"></div></div>';
-  o+='<button class="btn bp bfw" style="padding:12px 0" onclick="S.cCadastr=false;render();toast(\'Campo cadastrado! ✓\')">Cadastrar Campo ✓</button></div>';
+  // Snapshot dos inputs pra preservar entre renders
+  var s = window._campoForm || {};
+  var o='<div class="fu" style="padding:14px 14px">'+bb('S.cCadastr=false;window._campoForm=null;render()');
+  o+='<h3 style="font-weight:900;font-size:19px;margin:0 0 6px">🏟️ Cadastrar Campo</h3>';
+  o+='<p style="color:var(--text2);font-size:12px;margin-bottom:18px">Preencha os dados para receber reservas e pagamentos.</p>';
+  
+  // SEÇÃO 1: Campo
+  o+='<div style="font-size:11px;font-weight:800;color:var(--green);margin-bottom:10px;text-transform:uppercase">⚽ Dados do Campo</div>';
+  o+='<div class="fg"><label class="fl">Nome do campo *</label><input id="cf-nome" class="fi" value="'+esc(s.nome||'')+'" oninput="_campoInp(\'nome\',this.value)" placeholder="Ex: Arena Verde"></div>';
+  o+='<div class="fg"><label class="fl">Preço por hora (R$) *</label><input id="cf-preco" class="fi" type="number" value="'+esc(s.preco||'')+'" oninput="_campoInp(\'preco\',this.value)" placeholder="Ex: 120"></div>';
+  o+='<div class="fg"><label class="fl">Emoji/Ícone</label><input id="cf-img" class="fi" value="'+esc(s.img||'🏟️')+'" oninput="_campoInp(\'img\',this.value)" placeholder="🏟️" maxlength="2" style="font-size:22px;text-align:center"></div>';
+  
+  // SEÇÃO 2: Endereço
+  o+='<div style="font-size:11px;font-weight:800;color:var(--green);margin:18px 0 10px;text-transform:uppercase">📍 Endereço</div>';
+  o+='<div class="fg"><label class="fl">CEP *</label><input id="cf-cep" class="fi" value="'+esc(s.cep||'')+'" oninput="_campoCEP(this)" placeholder="00000-000" maxlength="9" inputmode="numeric"></div>';
+  o+='<div class="fg"><label class="fl">Rua *</label><input id="cf-rua" class="fi" value="'+esc(s.rua||'')+'" oninput="_campoInp(\'rua\',this.value)" placeholder="Rua, Av..."></div>';
+  o+='<div style="display:flex;gap:9px"><div class="fg" style="flex:1"><label class="fl">Número *</label><input id="cf-num" class="fi" value="'+esc(s.numero||'')+'" oninput="_campoInp(\'numero\',this.value)" placeholder="123"></div>';
+  o+='<div class="fg" style="flex:2"><label class="fl">Bairro *</label><input id="cf-bairro" class="fi" value="'+esc(s.bairro||'')+'" oninput="_campoInp(\'bairro\',this.value)" placeholder="Centro"></div></div>';
+  o+='<div style="display:flex;gap:9px"><div class="fg" style="flex:2"><label class="fl">Cidade *</label><input id="cf-cidade" class="fi" value="'+esc(s.cidade||'Goiânia')+'" oninput="_campoInp(\'cidade\',this.value)"></div>';
+  o+='<div class="fg" style="width:80px"><label class="fl">UF *</label><input id="cf-uf" class="fi" value="'+esc(s.uf||'GO')+'" oninput="_campoInp(\'uf\',this.value.toUpperCase())" maxlength="2"></div></div>';
+  
+  // SEÇÃO 3: Dono (pra contato/repasse)
+  o+='<div style="font-size:11px;font-weight:800;color:var(--yellow);margin:18px 0 10px;text-transform:uppercase">👤 Dados do Responsável</div>';
+  o+='<div class="card" style="margin-bottom:13px;border-color:rgba(255,190,0,.25);background:rgba(255,190,0,.05)">';
+  o+='<div style="color:var(--yellow);font-size:11px;margin-bottom:10px">🔒 Essas informações são necessárias para identificação fiscal e repasse dos pagamentos. Apenas você e a administração veem esses dados.</div>';
+  o+='</div>';
+  o+='<div class="fg"><label class="fl">Nome completo *</label><input id="cf-dnome" class="fi" value="'+esc(s.donoNome||S.perfNome||'')+'" oninput="_campoInp(\'donoNome\',this.value)" placeholder="Nome do responsável"></div>';
+  o+='<div class="fg"><label class="fl">CPF ou CNPJ *</label><input id="cf-doc" class="fi" value="'+esc(s.donoDoc||'')+'" oninput="_campoDoc(this)" placeholder="000.000.000-00" maxlength="18" inputmode="numeric"></div>';
+  o+='<div class="fg"><label class="fl">Telefone *</label><input id="cf-dtel" class="fi" value="'+esc(s.donoTel||'')+'" oninput="this.value=_formatarTelefone(this.value);_campoInp(\'donoTel\',this.value)" placeholder="(62) 99999-9999" maxlength="15" inputmode="tel"></div>';
+  o+='<div class="fg"><label class="fl">Email *</label><input id="cf-demail" class="fi" value="'+esc(s.donoEmail||S.perfEmail||'')+'" oninput="_campoInp(\'donoEmail\',this.value)" placeholder="email@exemplo.com" type="email"></div>';
+  
+  // SEÇÃO 4: PIX
+  o+='<div style="font-size:11px;font-weight:800;color:var(--green);margin:18px 0 10px;text-transform:uppercase">💰 Recebimento (PIX)</div>';
+  o+='<div class="fg"><label class="fl">Chave PIX para receber pagamentos *</label><input id="cf-pix" class="fi" value="'+esc(s.chavePix||'')+'" oninput="_campoInp(\'chavePix\',this.value)" placeholder="CPF, email, telefone ou aleatória"></div>';
+  o+='<div class="fg"><label class="fl">Tipo de chave *</label><select id="cf-pixtipo" class="fi" onchange="_campoInp(\'tipoChavePix\',this.value)">'
+    +['CPF/CNPJ','Email','Telefone','Aleatória'].map(function(t){return '<option value="'+t+'"'+(s.tipoChavePix===t?' selected':'')+'>'+t+'</option>';}).join('')
+    +'</select></div>';
+  
+  // Botão
+  o+='<button id="cf-btn" class="btn bp bfw" style="padding:13px 0;font-size:15px;margin-top:12px" onclick="_salvarCampo()">✅ Cadastrar Campo</button>';
+  o+='<p style="color:var(--muted);font-size:11px;margin-top:12px;text-align:center">Ao cadastrar você concorda em receber pagamentos PIX via FutStory.</p>';
+  o+='</div>';
   return o;
 }
+
+// Helper: atualizar input no snapshot sem re-renderizar
+function _campoInp(campo, valor){
+  if(!window._campoForm) window._campoForm = {};
+  window._campoForm[campo] = valor;
+}
+
+// Helper: CEP com busca ViaCEP
+function _campoCEP(input){
+  var cep = input.value.replace(/\D/g,'').slice(0,8);
+  // formata 00000-000
+  if(cep.length>5) input.value = cep.slice(0,5)+'-'+cep.slice(5);
+  else input.value = cep;
+  _campoInp('cep', input.value);
+  // Se 8 dígitos, busca automaticamente
+  if(cep.length===8){
+    fetch('https://viacep.com.br/ws/'+cep+'/json/')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.erro) return;
+        var ruaEl=document.getElementById('cf-rua');
+        var bairroEl=document.getElementById('cf-bairro');
+        var cidadeEl=document.getElementById('cf-cidade');
+        var ufEl=document.getElementById('cf-uf');
+        if(ruaEl&&d.logradouro){ ruaEl.value=d.logradouro; _campoInp('rua',d.logradouro); }
+        if(bairroEl&&d.bairro){ bairroEl.value=d.bairro; _campoInp('bairro',d.bairro); }
+        if(cidadeEl&&d.localidade){ cidadeEl.value=d.localidade; _campoInp('cidade',d.localidade); }
+        if(ufEl&&d.uf){ ufEl.value=d.uf; _campoInp('uf',d.uf); }
+        toast('Endereço preenchido! ✓');
+      }).catch(function(){});
+  }
+}
+
+// Helper: formata CPF ou CNPJ automaticamente
+function _campoDoc(input){
+  var v = input.value.replace(/\D/g,'');
+  if(v.length<=11){ input.value=_formatarCPF(v); }
+  else{
+    v=v.slice(0,14);
+    if(v.length<=2)input.value=v;
+    else if(v.length<=5)input.value=v.slice(0,2)+'.'+v.slice(2);
+    else if(v.length<=8)input.value=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5);
+    else if(v.length<=12)input.value=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5,8)+'/'+v.slice(8);
+    else input.value=v.slice(0,2)+'.'+v.slice(2,5)+'.'+v.slice(5,8)+'/'+v.slice(8,12)+'-'+v.slice(12);
+  }
+  _campoInp('donoDoc', input.value);
+}
+
+// Salva o campo no Firestore
+function _salvarCampo(){
+  if(!S.fbUser){ toast('Faça login primeiro'); return; }
+  var f = window._campoForm || {};
+  
+  // Ler valores atuais dos inputs (garantia)
+  var get = function(id){ var el=document.getElementById(id); return el?el.value.trim():''; };
+  f.nome = get('cf-nome') || f.nome;
+  f.preco = get('cf-preco') || f.preco;
+  f.img = get('cf-img') || f.img || '🏟️';
+  f.cep = get('cf-cep') || f.cep;
+  f.rua = get('cf-rua') || f.rua;
+  f.numero = get('cf-num') || f.numero;
+  f.bairro = get('cf-bairro') || f.bairro;
+  f.cidade = get('cf-cidade') || f.cidade;
+  f.uf = get('cf-uf') || f.uf;
+  f.donoNome = get('cf-dnome') || f.donoNome;
+  f.donoDoc = get('cf-doc') || f.donoDoc;
+  f.donoTel = get('cf-dtel') || f.donoTel;
+  f.donoEmail = get('cf-demail') || f.donoEmail;
+  f.chavePix = get('cf-pix') || f.chavePix;
+  f.tipoChavePix = get('cf-pixtipo') || f.tipoChavePix || 'CPF/CNPJ';
+  
+  // Validações
+  var erros=[];
+  if(!f.nome) erros.push('Nome do campo');
+  if(!f.preco || parseFloat(f.preco)<5) erros.push('Preço (mínimo R$ 5)');
+  if(!f.cep || f.cep.replace(/\D/g,'').length!==8) erros.push('CEP');
+  if(!f.rua) erros.push('Rua');
+  if(!f.numero) erros.push('Número');
+  if(!f.bairro) erros.push('Bairro');
+  if(!f.cidade) erros.push('Cidade');
+  if(!f.donoNome) erros.push('Nome do responsável');
+  if(!f.donoDoc) erros.push('CPF/CNPJ');
+  var docDigits = String(f.donoDoc||'').replace(/\D/g,'');
+  if(docDigits.length===11 && !_validarCPF(docDigits)) erros.push('CPF inválido');
+  if(docDigits.length!==11 && docDigits.length!==14) erros.push('CPF ou CNPJ (11 ou 14 dígitos)');
+  if(!f.donoTel || f.donoTel.replace(/\D/g,'').length<10) erros.push('Telefone do responsável');
+  if(!f.donoEmail || !f.donoEmail.includes('@')) erros.push('Email do responsável');
+  if(!f.chavePix) erros.push('Chave PIX');
+  if(erros.length>0){
+    toast('❌ Preencha: '+erros.slice(0,3).join(', ')+(erros.length>3?'...':''));
+    return;
+  }
+  
+  // Loading
+  var btn = document.getElementById('cf-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='Salvando...'; }
+  
+  var campoData = {
+    nome: f.nome,
+    img: f.img,
+    preco: parseFloat(f.preco),
+    end: f.rua+', '+f.numero,
+    rua: f.rua,
+    numero: f.numero,
+    bairro: f.bairro,
+    cidade: f.cidade,
+    uf: f.uf,
+    cep: f.cep,
+    enderecoCompleto: f.rua+', '+f.numero+' - '+f.bairro+', '+f.cidade+'/'+f.uf+' - CEP '+f.cep,
+    // Dados do dono (apenas dono + admin podem ler via Rules)
+    donoUid: S.fbUser.uid,
+    donoNome: f.donoNome,
+    donoDoc: docDigits,
+    donoTel: f.donoTel.replace(/\D/g,''),
+    donoEmail: f.donoEmail,
+    chavePix: f.chavePix,
+    tipoChavePix: f.tipoChavePix,
+    // Metadados
+    criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+    ativo: true,
+    foto: null,
+    fotos: [],
+    seguidores: 0
+  };
+  
+  _fbDb.collection('campos').add(campoData).then(function(docRef){
+    toast('Campo cadastrado com sucesso! ✓');
+    window._campoForm = null;
+    S.cCadastr = false;
+    // Recarregar lista
+    D.camposFirestore = [];
+    S.camposCarregando = false;
+    _carregarCamposFirestore();
+    render();
+    sc();
+  }).catch(function(e){
+    if(btn){ btn.disabled=false; btn.innerHTML='✅ Cadastrar Campo'; }
+    toast('❌ Erro: '+e.message);
+  });
+}
+
 
 /* ── MENSAGENS ──────────────────────────────────── */
 function screenMensagens(){
