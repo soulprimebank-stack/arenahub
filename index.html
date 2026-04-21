@@ -7,7 +7,40 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#07090F" id="theme-meta"/>
-<meta name="description" content="FutStory — Futebol amador na palma da mão"/>
+<meta name="description" content="FutStory — Futebol amador na palma da mão. Encontre jogos, reserve campos e conecte-se com jogadores da sua região. Goiânia e região."/>
+<!-- Open Graph (WhatsApp, Facebook, Instagram, Telegram, LinkedIn) -->
+<meta property="og:type" content="website"/>
+<meta property="og:site_name" content="FutStory"/>
+<meta property="og:title" content="FutStory — Futebol amador na palma da mão"/>
+<meta property="og:description" content="Encontre jogos, reserve campos e conecte-se com jogadores da sua região. Goiânia e região."/>
+<meta property="og:image" content="https://soulprimebank-stack.github.io/arenahub/og-image.png"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:alt" content="FutStory — Futebol amador na palma da mão"/>
+<meta property="og:url" content="https://soulprimebank-stack.github.io/arenahub/"/>
+<meta property="og:locale" content="pt_BR"/>
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="FutStory — Futebol amador na palma da mão"/>
+<meta name="twitter:description" content="Encontre jogos, reserve campos e conecte-se com jogadores da sua região. Goiânia e região."/>
+<meta name="twitter:image" content="https://soulprimebank-stack.github.io/arenahub/og-image.png"/>
+<!--
+  Google Analytics 4 (opcional — pra medir tráfego do lançamento)
+  Como ativar:
+  1. Crie conta em https://analytics.google.com/ (gratuito)
+  2. Crie uma "Property" chamada FutStory com URL https://soulprimebank-stack.github.io/arenahub/
+  3. Copie o ID da Data Stream (formato G-XXXXXXXXXX)
+  4. Descomente as linhas abaixo e substitua G-XXXXXXXXXX pelo seu ID real
+-->
+<!--
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX');
+</script>
+-->
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
@@ -273,6 +306,7 @@ hr.dv{border:none;border-top:1px solid var(--bord);margin:11px 0;}
     </button>
   </div>
 </div>
+<div id="offline-banner" style="display:none;background:#FFBE00;color:#07090F;padding:7px 14px;text-align:center;font-weight:700;font-size:12px;gap:6px;align-items:center;justify-content:center">📡 Você está offline — algumas ações podem não funcionar</div>
 <div id="ptr-bar" style="height:0;overflow:hidden;text-align:center;background:var(--bg);transition:height .2s;font-size:12px;color:var(--green);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"></div>
 <div id="srch-wrap" style="display:none;padding:8px 14px;border-bottom:1px solid var(--bord);background:var(--bg)">
   <div style="display:flex;align-items:center;gap:9px;background:var(--surf);border:1.5px solid var(--green);border-radius:12px;padding:8px 12px">
@@ -803,7 +837,7 @@ function salvarPerfil(){
       if(S.perfFotoUrl&&S.perfFotoUrl.startsWith('http'))upd.photoURL=S.perfFotoUrl;
       auth.currentUser.updateProfile(upd);
     }
-  }catch(e){}
+  }catch(e){ console.warn('updateProfile Auth:', e.message); }
   // Atualiza topbar imediatamente
   refreshBadges();
   // Salva perfil no Firestore para persistir entre sessões
@@ -835,6 +869,18 @@ function _initFirebase(){
   _fbAuth.languageCode='pt-BR';
   // Inicializa Firestore
   _fbDb=firebase.firestore(_fbApp);
+  // Habilita cache offline (persistência IndexedDB) — usuários com sinal ruim continuam funcionais
+  try{
+    _fbDb.enablePersistence({synchronizeTabs:true}).catch(function(err){
+      if(err.code==='failed-precondition'){
+        // Múltiplas abas abertas — persistence só funciona em uma
+        console.warn('Persistência offline: múltiplas abas, só uma usará cache.');
+      } else if(err.code==='unimplemented'){
+        // Browser muito antigo ou modo anônimo
+        console.warn('Persistência offline não suportada neste navegador.');
+      }
+    });
+  }catch(_e){ console.warn('Persistência offline:',_e); }
   _fbAuth.onAuthStateChanged(function(user){
     if(user){
       S.logado=true;
@@ -1403,10 +1449,10 @@ function doRecuperarSenha(){
   var em=document.getElementById('login-email');
   var email=em?em.value.trim():'';
   if(!email){
-    // Pede o email via prompt se campo vazio
-    email=prompt('Digite seu email para recuperar a senha:');
-    if(!email)return;
-    email=email.trim();
+    // UX melhor que prompt: pede pra digitar no campo e foca
+    toast('Digite seu email primeiro 📧');
+    if(em){ em.focus(); em.style.borderColor='var(--gold)'; setTimeout(function(){if(em)em.style.borderColor='';},2000); }
+    return;
   }
   var auth=_initFirebase();
   auth.sendPasswordResetEmail(email)
@@ -1416,9 +1462,11 @@ function doRecuperarSenha(){
     .catch(function(err){
       var msgs={
         'auth/user-not-found':'Email não encontrado.',
-        'auth/invalid-email':'Email inválido.'
+        'auth/invalid-email':'Email inválido.',
+        'auth/too-many-requests':'Muitas tentativas. Aguarde alguns minutos.',
+        'auth/network-request-failed':'Sem conexão. Verifique sua internet.'
       };
-      toast(msgs[err.code]||'Erro ao enviar email.');
+      toast(msgs[err.code]||'Erro ao enviar email. Tente novamente.');
     });
 }
 function doLogin(){
@@ -1447,9 +1495,13 @@ function doLogin(){
         'auth/wrong-password':'Senha incorreta.',
         'auth/invalid-email':'Email inválido.',
         'auth/too-many-requests':'Muitas tentativas. Tente mais tarde.',
-        'auth/invalid-credential':'Email ou senha incorretos.'
+        'auth/invalid-credential':'Email ou senha incorretos.',
+        'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
+        'auth/user-disabled':'Esta conta foi desativada.'
       };
       S.loginErro=msgs[err.code]||'Erro ao entrar. Tente novamente.';
+      // Reativa o botão mesmo em erro
+      if(btn){btn.textContent='Entrar';btn.disabled=false;}
       render();
     });
 }
@@ -1471,6 +1523,20 @@ function doCadastro(){
       S.fbUser=user;
       S.perfNome=nm.value.trim();
       S.perfEmail=em.value.trim();
+      // Salva perfil mínimo no Firestore IMEDIATAMENTE (evita perfil órfão)
+      try{
+        _fbDb.collection('usuarios').doc(user.uid).set({
+          nome: S.perfNome,
+          email: S.perfEmail,
+          uid: user.uid,
+          av: S.perfAv || '🧑',
+          pos: S.perfPos || 'MEI',
+          nivel: S.perfNivel || 'Iniciante',
+          cidade: S.perfCidade || '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizado: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true}).catch(function(e){ console.warn('salvar perfil cadastro:',e); });
+      }catch(_e){}
       render();
       toast('Conta criada! Bem-vindo '+S.perfNome+' ⚽');
       checkOnboarding();
@@ -1480,7 +1546,8 @@ function doCadastro(){
         'auth/email-already-in-use':'Este email já está cadastrado.',
         'auth/invalid-email':'Email inválido.',
         'auth/weak-password':'Senha muito fraca. Use pelo menos 6 caracteres.',
-        'auth/operation-not-allowed':'Cadastro desativado temporariamente.'
+        'auth/operation-not-allowed':'Cadastro desativado temporariamente.',
+        'auth/network-request-failed':'Sem conexão. Verifique sua internet.'
       };
       S.loginErro=msgs[err.code]||'Erro ao criar conta. Tente novamente.';
       render();
@@ -1510,6 +1577,21 @@ function doLoginGoogle(){
       S.perfNome=cred.user.displayName||'Jogador';
       S.perfEmail=cred.user.email;
       if(cred.user.photoURL) S.perfFoto=cred.user.photoURL;
+      // Salva perfil mínimo no Firestore IMEDIATAMENTE (evita perfil órfão se usuário sair durante onboarding)
+      try{
+        _fbDb.collection('usuarios').doc(cred.user.uid).set({
+          nome: S.perfNome,
+          email: S.perfEmail,
+          uid: cred.user.uid,
+          fotoUrl: cred.user.photoURL || null,
+          av: S.perfAv || '🧑',
+          pos: S.perfPos || 'MEI',
+          nivel: S.perfNivel || 'Iniciante',
+          cidade: S.perfCidade || '',
+          criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+          atualizado: firebase.firestore.FieldValue.serverTimestamp()
+        }, {merge:true}).catch(function(e){ console.warn('salvar perfil Google:',e); });
+      }catch(_e){}
       render();
       toast('Bem-vindo, '+S.perfNome+'! 🎉');
       checkOnboarding();
@@ -3936,6 +4018,31 @@ document.addEventListener('DOMContentLoaded', function(){
 try { _initFirebase(); } catch(e) {}
 render();
 startNotifTimer();
+
+// Detector de online/offline — mostra banner no topo quando offline
+function _atualizarStatusOffline(){
+  var banner = document.getElementById('offline-banner');
+  if(!banner) return;
+  banner.style.display = navigator.onLine ? 'none' : 'flex';
+}
+window.addEventListener('online', function(){
+  _atualizarStatusOffline();
+  if(typeof toast === 'function') toast('🟢 Conectado novamente');
+});
+window.addEventListener('offline', function(){
+  _atualizarStatusOffline();
+  if(typeof toast === 'function') toast('📡 Sem conexão');
+});
+_atualizarStatusOffline(); // estado inicial
+
+// Error handler global — captura erros não-tratados pra debugging
+window.addEventListener('error', function(e){
+  console.error('[GLOBAL ERROR]', e.message, 'at', e.filename, ':', e.lineno);
+  // Não mostra toast pra usuário porque pode spammar — só loga
+});
+window.addEventListener('unhandledrejection', function(e){
+  console.error('[UNHANDLED PROMISE]', e.reason);
+});
 
 // Registra Service Worker (PWA) — só em HTTPS/localhost
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
