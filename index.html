@@ -4366,25 +4366,64 @@ window.addEventListener('unhandledrejection', function(e){
 });
 
 // Registra Service Worker (PWA) — só em HTTPS/localhost
+// Detecta novas versões e oferece botão pra recarregar
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js')
       .then(function(reg) {
         console.log('[SW] registrado, scope:', reg.scope);
-        // Detecta update e notifica o usuário
+        
+        // Check por atualização a cada 30 segundos
+        setInterval(function(){ reg.update().catch(function(){}); }, 30000);
+        
+        // Detecta versão nova pronta
         reg.addEventListener('updatefound', function() {
           var newWorker = reg.installing;
           if (!newWorker) return;
           newWorker.addEventListener('statechange', function() {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // Há uma versão nova esperando
-              if (typeof toast === 'function') toast('Nova versão disponível! Recarregue a página 🔄');
+              _mostrarBannerAtualizacao(newWorker);
             }
           });
         });
       })
       .catch(function(err) { console.warn('[SW] falhou:', err); });
+    
+    // Recarrega automaticamente quando o novo SW assume controle
+    var _recarregando = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (_recarregando) return;
+      _recarregando = true;
+      window.location.reload();
+    });
   });
+}
+
+// Banner visual pra oferecer atualizar
+function _mostrarBannerAtualizacao(novoWorker){
+  // Remove banner antigo se houver
+  var existe = document.getElementById('upd-banner');
+  if (existe) existe.remove();
+  
+  var bn = document.createElement('div');
+  bn.id = 'upd-banner';
+  bn.style.cssText = 'position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99999;background:var(--green,#00F082);color:#07090F;padding:12px 18px;border-radius:99px;box-shadow:0 4px 20px rgba(0,240,130,.4);font-weight:800;font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer;animation:slideUp .3s ease-out';
+  bn.innerHTML = '🎉 Nova versão disponível <span style="background:rgba(0,0,0,.2);padding:4px 10px;border-radius:99px;font-size:12px">Atualizar</span>';
+  bn.onclick = function(){
+    bn.innerHTML = '<span>Atualizando...</span>';
+    // Manda mensagem pro SW novo assumir controle
+    novoWorker.postMessage({type: 'SKIP_WAITING'});
+    // O listener 'controllerchange' vai recarregar a página
+  };
+  document.body.appendChild(bn);
+  
+  // CSS de animação (adiciona uma vez)
+  if (!document.getElementById('upd-css')) {
+    var st = document.createElement('style');
+    st.id = 'upd-css';
+    st.textContent = '@keyframes slideUp{from{transform:translate(-50%,40px);opacity:0}to{transform:translate(-50%,0);opacity:1}}';
+    document.head.appendChild(st);
+  }
 }
 </script>
 </body>
