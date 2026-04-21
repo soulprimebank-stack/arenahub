@@ -623,6 +623,7 @@ function openPerfil(){
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'historico\')">📅 Minhas Reservas</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'ranking\')">🏆 Ranking</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();go(\'mensagens\')">💬 Mensagens</button>'+
+    '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();_pwaInstall&&_pwaInstall()">📲 Instalar app</button>'+
     '<button class="btn bs bfw" style="margin-bottom:9px" onclick="closeModal();openConfigs()">⚙️ Configurações</button>'+
     '<button class="btn bd bfw" style="font-size:12px;padding:9px 0" onclick="doLogout()">Sair da conta</button>');
 }
@@ -4747,6 +4748,154 @@ function _mostrarBannerAtualizacao(novoWorker){
     document.head.appendChild(st);
   }
 }
+
+/* ── PWA INSTALL PROMPT ───────────────────────────────── */
+// Captura o evento beforeinstallprompt e oferece instalação
+(function(){
+  var deferredPrompt = null;
+  var bannerExibido = false;
+  
+  // localStorage key pra não ser chato — respeita dismissal
+  function foiDismissadoRecentemente() {
+    try {
+      var t = localStorage.getItem('pwa_dismiss_ts');
+      if (!t) return false;
+      var dias = (Date.now() - parseInt(t)) / (1000*60*60*24);
+      return dias < 7; // não mostra de novo por 7 dias
+    } catch(e) { return false; }
+  }
+  
+  function marcarDismissado() {
+    try { localStorage.setItem('pwa_dismiss_ts', String(Date.now())); } catch(e) {}
+  }
+  
+  function marcarInstalado() {
+    try { localStorage.setItem('pwa_installed', '1'); } catch(e) {}
+  }
+  
+  function jaInstalou() {
+    try { return localStorage.getItem('pwa_installed') === '1'; } catch(e) { return false; }
+  }
+  
+  // Detecta modo standalone (já instalado)
+  function ehStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true;
+  }
+  
+  // Captura o prompt (Chrome/Edge/Android)
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('[PWA] install prompt capturado');
+    
+    // Espera 30s antes de mostrar banner (não irrita user novo)
+    if (!foiDismissadoRecentemente() && !jaInstalou() && !ehStandalone()) {
+      setTimeout(_mostrarBannerInstalar, 30000);
+    }
+  });
+  
+  // Quando user instala
+  window.addEventListener('appinstalled', function(){
+    console.log('[PWA] instalado!');
+    deferredPrompt = null;
+    marcarInstalado();
+    _removerBannerInstalar();
+    try { if (typeof toast === 'function') toast('🎉 FutStory instalado! Abra pela tela inicial.'); } catch(e) {}
+  });
+  
+  // Mostrar banner de instalação
+  window._mostrarBannerInstalar = function() {
+    if (bannerExibido) return;
+    if (ehStandalone()) return;
+    if (!deferredPrompt) {
+      // iOS não tem beforeinstallprompt — mostra instrução manual
+      if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !ehStandalone()) {
+        _mostrarBannerInstalarIOS();
+      }
+      return;
+    }
+    
+    bannerExibido = true;
+    var bn = document.createElement('div');
+    bn.id = 'pwa-install-banner';
+    bn.style.cssText = 'position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99999;background:linear-gradient(135deg,#00F082,#00C4AA);color:#07090F;padding:14px 18px;border-radius:16px;box-shadow:0 6px 28px rgba(0,240,130,.45);font-weight:700;font-size:13px;display:flex;align-items:center;gap:11px;max-width:340px;width:calc(100% - 28px);animation:slideUp .3s ease-out';
+    bn.innerHTML = 
+      '<div style="font-size:28px;flex-shrink:0">📲</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:900;font-size:14px;margin-bottom:2px">Instalar FutStory</div>' +
+        '<div style="font-size:11px;opacity:.85">Acesse mais rápido pela sua tela inicial</div>' +
+      '</div>' +
+      '<button id="pwa-inst-btn" style="background:#07090F;color:#00F082;border:none;padding:8px 14px;border-radius:99px;font-weight:800;font-size:12px;cursor:pointer;flex-shrink:0">Instalar</button>' +
+      '<button id="pwa-dis-btn" style="background:rgba(0,0,0,.15);color:#07090F;border:none;width:28px;height:28px;border-radius:50%;font-weight:900;font-size:14px;cursor:pointer;flex-shrink:0" aria-label="Fechar">✕</button>';
+    document.body.appendChild(bn);
+    
+    document.getElementById('pwa-inst-btn').onclick = async function() {
+      if (!deferredPrompt) return;
+      bn.style.pointerEvents = 'none';
+      try {
+        deferredPrompt.prompt();
+        var escolha = await deferredPrompt.userChoice;
+        console.log('[PWA] escolha:', escolha.outcome);
+        if (escolha.outcome === 'accepted') {
+          marcarInstalado();
+        } else {
+          marcarDismissado();
+        }
+      } catch(e) {
+        console.warn('[PWA] erro prompt:', e);
+      }
+      deferredPrompt = null;
+      _removerBannerInstalar();
+    };
+    
+    document.getElementById('pwa-dis-btn').onclick = function() {
+      marcarDismissado();
+      _removerBannerInstalar();
+    };
+  };
+  
+  // iOS: mostra instrução manual (Share → Adicionar à Tela de Início)
+  function _mostrarBannerInstalarIOS() {
+    if (bannerExibido) return;
+    bannerExibido = true;
+    var bn = document.createElement('div');
+    bn.id = 'pwa-install-banner';
+    bn.style.cssText = 'position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:99999;background:linear-gradient(135deg,#00F082,#00C4AA);color:#07090F;padding:14px 18px;border-radius:16px;box-shadow:0 6px 28px rgba(0,240,130,.45);font-weight:700;font-size:13px;display:flex;align-items:center;gap:11px;max-width:360px;width:calc(100% - 28px);animation:slideUp .3s ease-out';
+    bn.innerHTML = 
+      '<div style="font-size:28px;flex-shrink:0">📲</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:900;font-size:13px;margin-bottom:2px">Instalar no iPhone</div>' +
+        '<div style="font-size:11px;opacity:.85">Toque em <strong>Compartilhar</strong> e depois <strong>Adicionar à Tela de Início</strong></div>' +
+      '</div>' +
+      '<button id="pwa-dis-btn" style="background:rgba(0,0,0,.15);color:#07090F;border:none;width:28px;height:28px;border-radius:50%;font-weight:900;font-size:14px;cursor:pointer;flex-shrink:0" aria-label="Fechar">✕</button>';
+    document.body.appendChild(bn);
+    document.getElementById('pwa-dis-btn').onclick = function() {
+      marcarDismissado();
+      _removerBannerInstalar();
+    };
+  }
+  
+  window._removerBannerInstalar = function() {
+    var el = document.getElementById('pwa-install-banner');
+    if (el) el.remove();
+    bannerExibido = false;
+  };
+  
+  // iOS não dispara beforeinstallprompt — verifica na carga
+  window.addEventListener('load', function() {
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent) && !ehStandalone() && !foiDismissadoRecentemente() && !jaInstalou()) {
+      setTimeout(_mostrarBannerInstalarIOS, 30000);
+    }
+  });
+  
+  // Expor pra debug (e permitir botão manual no perfil no futuro)
+  window._pwaInstall = function() {
+    if (deferredPrompt) _mostrarBannerInstalar();
+    else if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) _mostrarBannerInstalarIOS();
+    else if (typeof toast === 'function') toast('App já instalado ou navegador não suporta');
+  };
+})();
 </script>
 </body>
 </html>
