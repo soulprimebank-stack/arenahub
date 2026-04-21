@@ -707,9 +707,26 @@ function handleMidiaUpload(input){
     };
     reader.readAsDataURL(file);
   } else {
-    // Vídeo — lê direto
+    // Vídeo — lê direto, mas valida tamanho
+    // Limite prático: 700KB em base64 = ~500KB original (base64 cresce ~33%)
+    var tamMB = file.size / 1024 / 1024;
+    if (file.size > 500000) {
+      toast('⚠️ Vídeo muito grande ('+tamMB.toFixed(1)+'MB). Máximo 500KB. Grave um vídeo mais curto.');
+      input.value = '';
+      return;
+    }
     var reader2=new FileReader();
-    reader2.onload=function(e){S.pMidiaUrl=e.target.result;renderPostModal();};
+    reader2.onload=function(e){
+      var dataUrl = e.target.result;
+      // Valida tamanho base64 final (pode inflar)
+      if (dataUrl.length > 900000) {
+        toast('⚠️ Vídeo muito pesado após conversão. Grave um mais curto.');
+        input.value = '';
+        return;
+      }
+      S.pMidiaUrl=dataUrl;
+      renderPostModal();
+    };
     reader2.readAsDataURL(file);
   }
 }
@@ -745,9 +762,19 @@ function publicarPost(){
   if(_fbDb){
     var postData=Object.assign({},novoPost);
     postData.timestamp=firebase.firestore.FieldValue.serverTimestamp();
-    // Imagem base64: limita tamanho (Firestore max 1MB por doc)
-    if(postData.midia&&postData.midia.url&&postData.midia.url.length>800000){
-      postData.midia.url=postData.midia.url.substring(0,800000);
+    // Validação final: Firestore tem limite de 1MB por doc. NÃO truncar (corrompe vídeos).
+    if(postData.midia&&postData.midia.url&&postData.midia.url.length>900000){
+      if(btn){btn.textContent='Publicar ✓';btn.disabled=false;}
+      if(postData.midia.tipo==='video'){
+        toast('⚠️ Vídeo muito grande pra publicar. Grave um mais curto (max 500KB).');
+      } else {
+        toast('⚠️ Imagem muito grande. Tente uma menor.');
+      }
+      // Restaura estado pra não perder conteúdo
+      S.pTxt=txt.trim();
+      S.pMidiaUrl=novoPost.midia?novoPost.midia.url:null;
+      S.pMidiaTipo=novoPost.midia?novoPost.midia.tipo:null;
+      return;
     }
     _fbDb.collection('posts').add(postData)
       .then(function(){toast('Publicado! ✓ 🎉');})
