@@ -588,7 +588,7 @@ function openNotif(){
   marcarNotifsLidas();
   D.notifs.forEach(function(n){n.lida=true;});
   refreshBadges();
-  var icons={vaga:'⚽',reserva:'📅',av:'⭐',jogo:'🎮',ranking:'🏆',curtida:'❤️',comentario:'💬',follow:'👤',like:'❤️'};
+  var icons={vaga:'⚽',reserva:'📅',av:'⭐',jogo:'🎮',ranking:'🏆',curtida:'❤️',comentario:'💬',follow:'👤',like:'❤️',msg:'💬',pagamento:'💰',reserva_recebida:'💰',inscricao_recebida:'🎯',novo_membro:'🦁',jogo_proximo:'⏰',jogo_agora:'🔥'};
   var rows=D.notifs.length>0?D.notifs.map(function(n){
     return '<div style="display:flex;gap:11px;padding:11px 13px;background:'+(n.lida?'transparent':'var(--card)')+';border-radius:13px;border:1px solid '+(n.lida?'transparent':'var(--bord)')+';margin-bottom:7px">'+
       '<div style="width:36px;height:36px;border-radius:9px;background:'+(n.lida?'var(--surf)':'rgba(0,240,130,.12)')+';display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">'+(icons[n.tipo]||'🔔')+'</div>'+
@@ -936,6 +936,7 @@ function _initFirebase(){
       _carregarSeguindo();
       _carregarJogadoresFirestore();
       _iniciarNotificacoesRealtime();
+      _iniciarLembretes();
     // Verificar se há campos no Firestore, senão fazer seed
     _fbDb.collection('campos').limit(1).get().then(function(snap){
       if(snap.empty) _seedCamposGoiania();
@@ -1885,13 +1886,22 @@ function _entrarNoTime(timeId){
   upd['membros.'+S.fbUser.uid]={nome:S.perfNome||S.fbUser.displayName||'Jogador',cargo:'Jogador',quando:firebase.firestore.FieldValue.serverTimestamp()};
   _fbDb.collection('times').doc(timeId).update(upd).then(function(){
     S.timeMeuTime=timeId;
-    // Atualizar local
+    // Achar capitão do time pra notificar
+    var capitao=null, timeNome='';
     for(var i=0;i<D.timesFirestore.length;i++){
       if(D.timesFirestore[i].id===timeId){
         if(!D.timesFirestore[i].membros) D.timesFirestore[i].membros={};
         D.timesFirestore[i].membros[S.fbUser.uid]={nome:S.perfNome||S.fbUser.displayName||'Jogador',cargo:'Jogador'};
+        capitao = D.timesFirestore[i].capitao;
+        timeNome = D.timesFirestore[i].nome || 'seu time';
         break;
       }
+    }
+    // Notificar capitão (se existe e não é o próprio user)
+    if(capitao && capitao !== S.fbUser.uid){
+      _enviarNotificacao(capitao, 'novo_membro',
+        (S.perfNome||'Alguém') + ' entrou em ' + timeNome + ' 🦁',
+        S.fbUser.uid, 'novo_membro');
     }
     toast('Entrou no time! 🦁');
     render();
@@ -4245,7 +4255,86 @@ function marcarNotifsLidas(){
   if(naoLidas.length>0) batch.commit().catch(function(){});
 }
 
-function startNotifTimer(){} // mantido para compatibilidade — notificações agora são do Firestore
+function startNotifTimer(){} // stub — notificações vêm do Firestore em tempo real
+
+/* ── LEMBRETES DE JOGO PRÓXIMO ─────────────────────── */
+// Verifica reservas do user que estão pra acontecer nas próximas 24h
+// Roda 1 vez ao logar + a cada 30 minutos
+var _lembretesUnsub = null;
+function _verificarJogosProximos(){
+  if (!_fbDb || !S.fbUser) return;
+  
+  // Buscar reservas pagas do jogador
+  _fbDb.collection('pagamentos')
+    .where('jogadorUid','==',S.fbUser.uid)
+    .where('status','==','AUTHORIZED')
+    .where('tipo','==','reserva_campo')
+    .get()
+    .then(function(snap){
+      var agora = new Date();
+      var agoraMs = agora.getTime();
+      var umDia = 24*60*60*1000;
+      var umaHora = 60*60*1000;
+      
+      snap.forEach(function(doc){
+        var p = doc.data();
+        if (!p.reservaData) return;
+        
+        // Parse data formato DD/MM/AAAA ou YYYY-MM-DD
+        var dataJogo;
+        if (p.reservaData.indexOf('/') > -1) {
+          var parts = p.reservaData.split('/');
+          dataJogo = new Date(parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0'));
+        } else {
+          dataJogo = new Date(p.reservaData);
+        }
+        if (isNaN(dataJogo.getTime())) return;
+        
+        // Aplicar hora se tiver
+        if (p.reservaHora) {
+          var h = p.reservaHora.split(':');
+          dataJogo.setHours(parseInt(h[0])||0, parseInt(h[1])||0, 0, 0);
+        }
+        
+        var diffMs = dataJogo.getTime() - agoraMs;
+        
+        // Detecta janela de 24h (amanhã) e 1h (hoje) usando localStorage pra não duplicar
+        var chave24 = 'lembrete24_' + doc.id;
+        var chave1 = 'lembrete1_' + doc.id;
+        
+        // 24h antes (entre 23h e 25h): lembrete amanhã
+        if (diffMs > 23*umaHora && diffMs < 25*umaHora) {
+          if (!localStorage.getItem(chave24)) {
+            _enviarNotificacao(S.fbUser.uid, 'jogo_proximo',
+              '⏰ Seu jogo em ' + (p.campoNome||'campo') + ' é amanhã às ' + (p.reservaHora||'') + '!',
+              S.fbUser.uid, 'jogo_proximo');
+            try { localStorage.setItem(chave24, '1'); } catch(e) {}
+          }
+        }
+        // 1h antes (entre 45min e 75min): lembrete agora
+        if (diffMs > 45*60*1000 && diffMs < 75*60*1000) {
+          if (!localStorage.getItem(chave1)) {
+            _enviarNotificacao(S.fbUser.uid, 'jogo_agora',
+              '🔥 Seu jogo em ' + (p.campoNome||'campo') + ' começa em 1 hora!',
+              S.fbUser.uid, 'jogo_agora');
+            try { localStorage.setItem(chave1, '1'); } catch(e) {}
+          }
+        }
+      });
+    })
+    .catch(function(e){ console.warn('verificar jogos:', e.code); });
+}
+
+function _iniciarLembretes(){
+  if (!S.fbUser) return;
+  _verificarJogosProximos(); // checa agora
+  if (_lembretesUnsub) clearInterval(_lembretesUnsub);
+  _lembretesUnsub = setInterval(_verificarJogosProximos, 30*60*1000); // a cada 30min
+}
+
+function _pararLembretes(){
+  if (_lembretesUnsub) { clearInterval(_lembretesUnsub); _lembretesUnsub = null; }
+}
 
 /* ── ONBOARDING ─────────────────────────────────── */
 function checkOnboarding() {
