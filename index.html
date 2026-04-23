@@ -1969,15 +1969,32 @@ function toggleSeguirJog(uid){
   if(uid===S.fbUser.uid){toast('Você não pode se seguir 😄');return;}
   var jaSegue=!!S.seguindo[uid];
   S.seguindo[uid]=!jaSegue;
+  
+  // Atualizar contador local imediatamente (otimista)
+  if(S.jSel && (S.jSel.uid===uid || S.jSel.id===uid)){
+    S.jSel.seg = (S.jSel.seg||0) + (jaSegue ? -1 : 1);
+    if(S.jSel.seg < 0) S.jSel.seg = 0;
+  }
+  // Atualizar também em D.jogadores
+  for(var i=0;i<D.jogadores.length;i++){
+    if(D.jogadores[i].uid===uid || D.jogadores[i].id===uid){
+      D.jogadores[i].seg = (D.jogadores[i].seg||0) + (jaSegue ? -1 : 1);
+      if(D.jogadores[i].seg < 0) D.jogadores[i].seg = 0;
+      break;
+    }
+  }
   render();
 
   var meuUid=S.fbUser.uid;
   var batch=_fbDb.batch();
+  var alvoRef=_fbDb.collection('usuarios').doc(uid);
 
   if(!jaSegue){
     // Seguir: cria documento em /seguindo/{meuUid}/lista/{uidAlvo}
     var segRef=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
     batch.set(segRef,{uid:uid,desde:firebase.firestore.FieldValue.serverTimestamp()});
+    // Incrementa contador seg no doc do alvo
+    batch.update(alvoRef,{seg:firebase.firestore.FieldValue.increment(1)});
     toast('Seguindo! 👤');
     // Dispara notificação para o alvo
     _enviarNotificacao(uid,'seguiu',S.perfNome+' começou a te seguir 👤',S.fbUser.uid,'follow');
@@ -1985,11 +2002,17 @@ function toggleSeguirJog(uid){
     // Deixar de seguir: remove documento
     var segRef2=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
     batch.delete(segRef2);
+    // Decrementa contador seg no doc do alvo
+    batch.update(alvoRef,{seg:firebase.firestore.FieldValue.increment(-1)});
     toast('Deixou de seguir');
   }
   batch.commit().catch(function(err){
     // Reverte em caso de erro
     S.seguindo[uid]=jaSegue;
+    if(S.jSel && (S.jSel.uid===uid || S.jSel.id===uid)){
+      S.jSel.seg = (S.jSel.seg||0) + (jaSegue ? 1 : -1);
+      if(S.jSel.seg < 0) S.jSel.seg = 0;
+    }
     render();
     console.warn('Erro ao seguir:',err);
   });
