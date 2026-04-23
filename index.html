@@ -384,7 +384,7 @@ var S={
   pTipo:"post",pTxt:"",
   comentando:null,vplay:null,
   tornAba:"abertos",tornSel:null,tornCriar:false,
-  msgSel:null,msgChat:[],msgChats:{},stMidiaUrl:null,stMidiaTipo:null,stMidiaBlob:null,stMidiaFile:null,
+  msgSel:null,msgChat:[],msgChats:{},msgMidiaUrl:null,msgMidiaTipo:null,stMidiaUrl:null,stMidiaTipo:null,stMidiaBlob:null,stMidiaFile:null,
   perfNome:"Você",perfPos:"MEI",perfNivel:"Avançado",perfCidade:"Goiânia",perfAv:"🧑",
   resAba:"campos",resCarregando:false,resData:null,
   meusAba:"campos",meusCarregando:false,meusData:null,meusEditId:null
@@ -1969,19 +1969,22 @@ function toggleSeguirJog(uid){
   if(uid===S.fbUser.uid){toast('Você não pode se seguir 😄');return;}
   var jaSegue=!!S.seguindo[uid];
   S.seguindo[uid]=!jaSegue;
+  var delta = jaSegue ? -1 : 1;
   
-  // Atualizar contador local imediatamente (otimista)
-  if(S.jSel && (S.jSel.uid===uid || S.jSel.id===uid)){
-    S.jSel.seg = (S.jSel.seg||0) + (jaSegue ? -1 : 1);
-    if(S.jSel.seg < 0) S.jSel.seg = 0;
-  }
-  // Atualizar também em D.jogadores
+  // Atualizar contador local apenas no D.jogadores (S.jSel pode ser o MESMO objeto, por referência)
+  var atualizado = false;
   for(var i=0;i<D.jogadores.length;i++){
     if(D.jogadores[i].uid===uid || D.jogadores[i].id===uid){
-      D.jogadores[i].seg = (D.jogadores[i].seg||0) + (jaSegue ? -1 : 1);
+      D.jogadores[i].seg = (D.jogadores[i].seg||0) + delta;
       if(D.jogadores[i].seg < 0) D.jogadores[i].seg = 0;
+      atualizado = true;
       break;
     }
+  }
+  // Se S.jSel NÃO é o mesmo objeto (caso de perfil carregado via openJogadorPorUid do Firestore), atualiza também
+  if(S.jSel && (S.jSel.uid===uid || S.jSel.id===uid) && !atualizado){
+    S.jSel.seg = (S.jSel.seg||0) + delta;
+    if(S.jSel.seg < 0) S.jSel.seg = 0;
   }
   render();
 
@@ -1990,28 +1993,26 @@ function toggleSeguirJog(uid){
   var alvoRef=_fbDb.collection('usuarios').doc(uid);
 
   if(!jaSegue){
-    // Seguir: cria documento em /seguindo/{meuUid}/lista/{uidAlvo}
     var segRef=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
     batch.set(segRef,{uid:uid,desde:firebase.firestore.FieldValue.serverTimestamp()});
-    // Incrementa contador seg no doc do alvo
     batch.update(alvoRef,{seg:firebase.firestore.FieldValue.increment(1)});
     toast('Seguindo! 👤');
-    // Dispara notificação para o alvo
     _enviarNotificacao(uid,'seguiu',S.perfNome+' começou a te seguir 👤',S.fbUser.uid,'follow');
   } else {
-    // Deixar de seguir: remove documento
     var segRef2=_fbDb.collection('seguindo').doc(meuUid).collection('lista').doc(uid);
     batch.delete(segRef2);
-    // Decrementa contador seg no doc do alvo
     batch.update(alvoRef,{seg:firebase.firestore.FieldValue.increment(-1)});
     toast('Deixou de seguir');
   }
   batch.commit().catch(function(err){
     // Reverte em caso de erro
     S.seguindo[uid]=jaSegue;
-    if(S.jSel && (S.jSel.uid===uid || S.jSel.id===uid)){
-      S.jSel.seg = (S.jSel.seg||0) + (jaSegue ? 1 : -1);
-      if(S.jSel.seg < 0) S.jSel.seg = 0;
+    for(var j=0;j<D.jogadores.length;j++){
+      if(D.jogadores[j].uid===uid || D.jogadores[j].id===uid){
+        D.jogadores[j].seg = (D.jogadores[j].seg||0) - delta;
+        if(D.jogadores[j].seg < 0) D.jogadores[j].seg = 0;
+        break;
+      }
     }
     render();
     console.warn('Erro ao seguir:',err);
@@ -2502,6 +2503,12 @@ function iniciarConversa(uidDestino, nomeDestino, fotoDestino){
   if(!S.fbUser){ toast('Faça login primeiro'); return; }
   if(uidDestino === S.fbUser.uid){ toast('Você não pode conversar com você mesmo 😄'); return; }
   var chatId = _getChatId(S.fbUser.uid, uidDestino);
+  // Primeiro navega (go limpa msgSel), DEPOIS define msgSel
+  S.scr = 'mensagens';
+  S.admin = false;
+  S.jSel=null;S.jCriar=false;S.tSel=null;S.tCriar=false;S.timePagMet='pix';S.timeMeuTime=null;
+  S.cSel=null;S.cEtapa='lista';S.cCadastr=false;
+  S.tornSel=null;S.tornCriar=false;
   S.msgSel = {
     id: chatId,
     uid: uidDestino,
@@ -2510,7 +2517,7 @@ function iniciarConversa(uidDestino, nomeDestino, fotoDestino){
     fotoUrl: fotoDestino && fotoDestino.startsWith('data:') ? fotoDestino : null
   };
   S.msgChat = [];
-  go('mensagens');
+  render(); sc();
   _abrirChatFirestore(chatId, uidDestino, nomeDestino);
 }
 
@@ -2578,9 +2585,11 @@ function backMsgs(){
 
 function sendMsg(){
   var inp = document.getElementById('msg-in');
-  if(!inp || !inp.value.trim()) return;
-  if(!_fbDb || !S.msgSel) return;
+  if(!inp) return;
   var txt = inp.value.trim();
+  // Se não tem texto nem mídia, não envia
+  if(!txt && !S.msgMidiaUrl) return;
+  if(!_fbDb || !S.msgSel) return;
   inp.value = '';
   var chatId = S.msgSel.id;
   var msg = {
@@ -2590,11 +2599,25 @@ function sendMsg(){
     av: S.perfFotoUrl || S.perfAv || '🧑',
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   };
+  // Adicionar mídia se presente
+  if(S.msgMidiaUrl){
+    msg.midia = { tipo: S.msgMidiaTipo && S.msgMidiaTipo.startsWith('video') ? 'video' : 'foto', url: S.msgMidiaUrl };
+    // Limpar estado após usar
+    S.msgMidiaUrl = null;
+    S.msgMidiaTipo = null;
+  }
+  // Validação Firestore (limite 1MB por doc)
+  if(msg.midia && msg.midia.url.length > 900000){
+    toast('⚠️ Mídia muito grande. Use uma menor.');
+    return;
+  }
+  // Preview pra lista de conversas
+  var ultimaPreview = txt || (msg.midia ? (msg.midia.tipo === 'video' ? '🎬 Vídeo' : '📷 Foto') : 'Mensagem');
   // Salva mensagem
   _fbDb.collection('chats').doc(chatId).collection('mensagens').add(msg);
   // Atualiza preview do chat
   _fbDb.collection('chats').doc(chatId).set({
-    ultima: txt,
+    ultima: ultimaPreview,
     ultimaHora: firebase.firestore.FieldValue.serverTimestamp(),
     participantes: [S.fbUser.uid, S.msgSel.uid],
     ['lido_' + S.msgSel.uid]: false,
@@ -2602,6 +2625,64 @@ function sendMsg(){
   }, {merge: true});
   // Notifica destinatário
   _enviarNotificacao(S.msgSel.uid, 'msg', S.perfNome + ' te enviou uma mensagem 💬', S.fbUser.uid, 'msg');
+  render();
+}
+
+// Handler de upload de mídia no chat
+function handleMsgMidiaUpload(input){
+  var file = input.files[0];
+  if(!file) return;
+  S.msgMidiaTipo = file.type;
+  
+  if(file.type.startsWith('image/')){
+    // Comprime imagem antes
+    var img = new Image();
+    var reader = new FileReader();
+    reader.onload = function(e){
+      img.onload = function(){
+        var canvas = document.createElement('canvas');
+        var maxSize = 800;
+        var w = img.width, h = img.height;
+        if(w > maxSize || h > maxSize){
+          if(w > h){ h = Math.round(h*maxSize/w); w = maxSize; }
+          else{ w = Math.round(w*maxSize/h); h = maxSize; }
+        }
+        canvas.width = w; canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        S.msgMidiaUrl = canvas.toDataURL('image/jpeg', 0.75);
+        render();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  } else {
+    // Vídeo: validar tamanho
+    if(file.size > 500000){
+      toast('⚠️ Vídeo muito grande. Máximo 500KB (~3-5s). Grave um mais curto.');
+      input.value = '';
+      return;
+    }
+    var reader2 = new FileReader();
+    reader2.onload = function(e){
+      var dataUrl = e.target.result;
+      if(dataUrl.length > 900000){
+        toast('⚠️ Vídeo muito pesado após conversão. Grave um mais curto.');
+        input.value = '';
+        return;
+      }
+      S.msgMidiaUrl = dataUrl;
+      render();
+    };
+    reader2.readAsDataURL(file);
+  }
+  input.value = '';
+}
+
+function _removerMidiaMsg(){
+  S.msgMidiaUrl = null;
+  S.msgMidiaTipo = null;
+  render();
 }
 
 function _carregarConversasFirestore(){
@@ -4187,11 +4268,46 @@ function screenMsgChat(m){
     o+='<div style="display:flex;flex-direction:'+(msg.meu?'row-reverse':'row')+';gap:7px;align-items:flex-end;margin-bottom:8px">';
     if(!msg.meu) o+=avMsg;
     o+='<div style="max-width:74%">';
-    o+='<div style="background:'+(msg.meu?'linear-gradient(135deg,var(--green),var(--teal))':'var(--surf)')+';color:'+(msg.meu?'var(--bg)':'var(--text)')+';border-radius:'+(msg.meu?'14px 14px 3px 14px':'14px 14px 14px 3px')+';padding:9px 12px;font-size:13px;line-height:1.4">'+esc(msg.txt)+'</div>';
+    // Renderizar mídia antes do texto
+    var midiaHtml = '';
+    if(msg.midia && msg.midia.url){
+      if(msg.midia.tipo === 'video'){
+        midiaHtml = '<div style="border-radius:12px;overflow:hidden;margin-bottom:'+(msg.txt?'5px':'0')+';max-width:240px"><video src="'+msg.midia.url+'" style="width:100%;max-height:320px;display:block;background:#000" controls playsinline></video></div>';
+      } else {
+        midiaHtml = '<div style="border-radius:12px;overflow:hidden;margin-bottom:'+(msg.txt?'5px':'0')+';max-width:240px"><img src="'+msg.midia.url+'" style="width:100%;max-height:320px;display:block;object-fit:cover"></div>';
+      }
+    }
+    if(midiaHtml) o += midiaHtml;
+    // Renderizar texto (só se tem)
+    if(msg.txt){
+      o+='<div style="background:'+(msg.meu?'linear-gradient(135deg,var(--green),var(--teal))':'var(--surf)')+';color:'+(msg.meu?'var(--bg)':'var(--text)')+';border-radius:'+(msg.meu?'14px 14px 3px 14px':'14px 14px 14px 3px')+';padding:9px 12px;font-size:13px;line-height:1.4">'+esc(msg.txt)+'</div>';
+    }
     o+='<div style="font-size:10px;color:var(--muted);margin-top:2px;text-align:'+(msg.meu?'right':'left')+'">'+(msg.hora||'agora')+'</div></div></div>';
   });
   o+='</div>';
-  o+='<div class="msg-chat-bar"><input class="msg-chat-in" id="msg-in" placeholder="Mensagem..." onkeydown="if(event.key===\'Enter\')sendMsg()"><button class="msg-chat-sn" onclick="sendMsg()">↑</button></div></div>';
+  
+  // Preview de mídia pendente (se houver)
+  if(S.msgMidiaUrl){
+    var previewHtml = '';
+    if(S.msgMidiaTipo && S.msgMidiaTipo.startsWith('video')){
+      previewHtml = '<div style="position:relative;margin-bottom:8px;max-width:160px"><video src="'+S.msgMidiaUrl+'" style="width:100%;border-radius:10px;max-height:120px;background:#000" muted></video><button onclick="_removerMidiaMsg()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></div>';
+    } else {
+      previewHtml = '<div style="position:relative;margin-bottom:8px;max-width:160px"><img src="'+S.msgMidiaUrl+'" style="width:100%;border-radius:10px;max-height:120px;object-fit:cover"><button onclick="_removerMidiaMsg()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.75);border:none;color:#fff;border-radius:99px;width:24px;height:24px;font-size:12px;cursor:pointer">✕</button></div>';
+    }
+    o += previewHtml;
+  }
+  
+  // Barra de input com botões de mídia
+  o+='<div class="msg-chat-bar" style="display:flex;align-items:center;gap:6px">';
+  // Botão foto (câmera/galeria)
+  o+='<label style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px">📷<input type="file" accept="image/*" style="display:none" onchange="handleMsgMidiaUpload(this)"></label>';
+  // Botão vídeo
+  o+='<label style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--surf);border:1.5px solid var(--bord);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px">🎬<input type="file" accept="video/*" style="display:none" onchange="handleMsgMidiaUpload(this)"></label>';
+  // Input de texto
+  o+='<input class="msg-chat-in" id="msg-in" placeholder="Mensagem..." onkeydown="if(event.key===\'Enter\')sendMsg()" style="flex:1">';
+  // Botão enviar
+  o+='<button class="msg-chat-sn" onclick="sendMsg()">↑</button>';
+  o+='</div></div>';
   return o;
 }
 
