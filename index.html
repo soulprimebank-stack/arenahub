@@ -1828,6 +1828,55 @@ function openJogador(id){for(var i=0;i<D.jogadores.length;i++){if(D.jogadores[i]
 function backJ(){S.jSel=null;S.jCriar=false;render();sc();}
 function setJES(n){S.jES=n;render();}
 
+// Abre perfil a partir de UID (Firestore) — usado nos cliques do feed
+function openJogadorPorUid(uid){
+  if(!uid)return;
+  if(S.fbUser && uid===S.fbUser.uid){openPerfil();return;} // meu próprio perfil
+  // 1. Tenta encontrar nos jogadores já carregados
+  for(var i=0;i<D.jogadores.length;i++){
+    if(D.jogadores[i].uid===uid || D.jogadores[i].id===uid){
+      S.jSel=D.jogadores[i];S.jAv=false;S.jES=0;render();sc();return;
+    }
+  }
+  // 2. Busca no cache de usuários
+  var cache = _usuariosCache[uid];
+  if(cache){
+    S.jSel = {
+      id: uid, uid: uid,
+      nome: cache.nome||'Jogador',
+      av: cache.av||'🧑',
+      fotoUrl: cache.fotoUrl||null,
+      pos: cache.pos||'MEI',
+      nivel: cache.nivel||'Iniciante',
+      cidade: cache.cidade||'',
+      seg: cache.seg||0,
+      gols: cache.gols||0, assist: cache.assist||0, jogos: cache.jogos||0,
+      nota: cache.nota||0
+    };
+    S.jAv=false;S.jES=0;render();sc();return;
+  }
+  // 3. Busca no Firestore
+  if(!_fbDb){toast('Carregando perfil...');return;}
+  _fbDb.collection('usuarios').doc(uid).get().then(function(doc){
+    if(!doc.exists){toast('Usuário não encontrado');return;}
+    var d=doc.data();
+    _usuariosCache[uid]=d;
+    S.jSel = {
+      id: uid, uid: uid,
+      nome: d.nome||'Jogador',
+      av: d.av||'🧑',
+      fotoUrl: d.fotoUrl||null,
+      pos: d.pos||'MEI',
+      nivel: d.nivel||'Iniciante',
+      cidade: d.cidade||'',
+      seg: d.seg||0,
+      gols: d.gols||0, assist: d.assist||0, jogos: d.jogos||0,
+      nota: d.nota||0
+    };
+    S.jAv=false;S.jES=0;render();sc();
+  }).catch(function(e){toast('Erro ao abrir perfil');console.warn(e);});
+}
+
 /* ── TIMES ACTIONS ────────────────────────────────── */
 function openTime(id){
   var lista = D.timesFirestore.length>0 ? D.timesFirestore : D.times;
@@ -2795,8 +2844,13 @@ function screenSocial(){
     }
     // Marca post do usuário atual
     var isMeu=S.fbUser&&post.uid===S.fbUser.uid;
-    o+='<div class="post-hd">'+postAvHtml+
-      '<div style="flex:1;min-width:0;margin-left:1px"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="post-name">'+esc(post.user)+'</span>'+pl(TLBL[post.tipo]||post.tipo,cor)+(isMeu?'<span style="font-size:9px;color:var(--muted)">você</span>':'')+'</div>'+
+    // Avatar e nome clicáveis — abrem perfil do autor
+    var uidAutor = post.uid||'';
+    var cursorStyle = uidAutor?';cursor:pointer':'';
+    var clickAutor = uidAutor?' onclick="openJogadorPorUid(\''+uidAutor+'\')"':'';
+    var avClicavel = uidAutor?('<div style="cursor:pointer"'+clickAutor+'>'+postAvHtml+'</div>'):postAvHtml;
+    o+='<div class="post-hd">'+avClicavel+
+      '<div style="flex:1;min-width:0;margin-left:1px"><div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span class="post-name"'+clickAutor+' style="'+cursorStyle+'">'+esc(post.user)+'</span>'+pl(TLBL[post.tipo]||post.tipo,cor)+(isMeu?'<span style="font-size:9px;color:var(--muted)">você</span>':'')+'</div>'+
       '<div class="post-meta">'+( post.time?esc(post.time)+' · ':'')+( post.hora||'agora')+'</div></div>'+
       '<button style="background:none;border:none;color:var(--muted);font-size:19px;padding:0 3px;cursor:pointer" onclick="openPostOpts(\''+post.id+'\','+isMeu+')">···</button></div>';
     o+='<p class="post-txt">'+esc(post.txt)+'</p>';
@@ -2873,10 +2927,17 @@ function screenJogadores(){
   var totalJog = somenteJogadores.length;
   o+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px"><span style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted)">Jogadores</span><span style="color:var(--muted);font-size:11px">'+totalJog+' encontrados</span></div>';
   somenteJogadores.forEach(function(j,i){
+    var jUid = j.uid || j.id;
+    var isSeg = S.seguindo[jUid] || false;
+    var ehMeu = S.fbUser && jUid === S.fbUser.uid;
     o+='<div class="ri tap" onclick="openJogador('+j.id+')">';
     o+='<span style="color:'+(i<3?'var(--gold)':'var(--muted)')+';font-weight:900;font-size:14px;width:20px;text-align:center;flex-shrink:0">'+(i<3?['🥇','🥈','🥉'][i]:(i+1)+'º')+'</span>';
     o+=av(j.av,42,i<3?'var(--gold)':'');
     o+='<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div>';
+    // Botão seguir rápido (só mostra se não é o user atual)
+    if(!ehMeu){
+      o+='<button onclick="event.stopPropagation();toggleSeguirJog(\''+jUid+'\')" style="flex-shrink:0;border-radius:99px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;background:'+(isSeg?'var(--card)':'var(--green)')+';color:'+(isSeg?'var(--green)':'var(--bg)')+';border:1.5px solid var(--green);margin-right:6px">'+(isSeg?'✓':'+')+'</button>';
+    }
     o+='<div style="text-align:right;flex-shrink:0">'+stars(j.nota||0,10)+'<div style="color:var(--muted);font-size:11px;margin-top:3px">'+(j.gols||0)+'⚽ '+(j.assist||0)+'🎯</div></div></div>';
   });
   if(totalJog===0){o+='<div class="empty" style="padding:16px 0">Nenhum jogador encontrado.</div>';}
@@ -5029,10 +5090,13 @@ function openComments(postId) {
       var avHtml = (cm.avatarTipo==='foto'&&cm.av&&cm.av.startsWith('data:'))
         ? '<div style="width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0"><img src="'+cm.av+'" style="width:100%;height:100%;object-fit:cover"></div>'
         : av(cm.av||'🧑', 34);
+      var uidAutor = cm.uid||'';
+      var clickAutor = uidAutor?' onclick="closeModal();openJogadorPorUid(\''+uidAutor+'\')"':'';
+      var cursorStyle = uidAutor?'cursor:pointer;':'';
       o += '<div style="display:flex;gap:9px;margin-bottom:13px">';
-      o += avHtml;
+      o += uidAutor?('<div style="'+cursorStyle+'"'+clickAutor+'>'+avHtml+'</div>'):avHtml;
       o += '<div style="flex:1;background:var(--surf);border-radius:0 13px 13px 13px;padding:9px 12px">';
-      o += '<div style="font-weight:700;font-size:12px;margin-bottom:3px">'+esc(cm.user)+'<span style="color:var(--muted);font-weight:400;margin-left:7px">'+( cm.hora||'agora')+'</span></div>';
+      o += '<div style="font-weight:700;font-size:12px;margin-bottom:3px"><span style="'+cursorStyle+'"'+clickAutor+'>'+esc(cm.user)+'</span><span style="color:var(--muted);font-weight:400;margin-left:7px">'+( cm.hora||'agora')+'</span></div>';
       o += '<div style="font-size:13px;line-height:1.5">'+esc(cm.txt)+'</div></div></div>';
     });
   }
