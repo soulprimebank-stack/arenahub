@@ -504,7 +504,7 @@ var times=tFonte.filter(function(t){return t.nome.toLowerCase().indexOf(q)>=0;})
   if(total===0){return o+'<div class="empty"><div style="font-size:38px;margin-bottom:10px">🔍</div><div>Nenhum resultado para "'+esc(S.busca)+'"</div></div></div>';}
   o+='<div style="color:var(--muted);font-size:12px;margin-bottom:14px">'+total+' resultado'+(total>1?'s':'')+' para "'+esc(S.busca)+'"</div>';
   function section(titulo,items,renderFn){if(!items.length)return '';var s='<div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--muted);margin-bottom:8px">'+titulo+'</div>';items.forEach(function(i){s+=renderFn(i);});return s+'<div style="height:14px"></div>';}
-  o+=section('Jogadores',jogs,function(j){return '<div class="ri" onclick="toggleSearch();openJogador('+j.id+')">'+av(j.av,38)+'<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div><div style="text-align:right">'+stars(j.nota,10)+'<div style="color:var(--muted);font-size:10px;margin-top:2px">'+j.gols+'⚽</div></div></div>';});
+  o+=section('Jogadores',jogs,function(j){return '<div class="ri" onclick="toggleSearch();openJogadorPorUid(\''+(j.uid||j.id)+'\')">'+av(j.av,38)+'<div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div><div style="text-align:right">'+stars(j.nota,10)+'<div style="color:var(--muted);font-size:10px;margin-top:2px">'+j.gols+'⚽</div></div></div>';});
   o+=section('Times',times,function(t){return '<div class="ri" onclick="toggleSearch();openTime('+t.id+')"><div style="font-size:30px">'+t.badge+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+t.cidade+' · '+t.vit+'V</div></div>'+pl('Ranking','#4D9EFF')+'</div>';});
   o+=section('Campos',campos,function(c){return '<div class="ri" data-cid="'+c.id+'" onclick="toggleSearch();openCampoFirestore(this.dataset.cid)"><div style="font-size:30px">'+(c.img||'🏟️')+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(c.nome||'Campo')+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+esc(c.bairro||c.end||'')+'</div></div><div style="color:var(--green);font-weight:900;font-size:14px">R$ '+(c.preco||'--')+'</div></div>';});
   o+=section('Torneios',torns,function(t){return '<div class="ri" data-tid="'+t.id+'" onclick="openTorn(this.dataset.tid);toggleSearch()"><div style="font-size:28px">'+t.badge+'</div><div style="flex:1"><div style="font-weight:700;font-size:13px">'+esc(t.nome)+'</div><div style="color:var(--muted);font-size:11px;margin-top:2px">'+t.data+' · '+t.premio+'</div></div></div>';});
@@ -2930,7 +2930,7 @@ function screenJogadores(){
     var jUid = j.uid || j.id;
     var isSeg = S.seguindo[jUid] || false;
     var ehMeu = S.fbUser && jUid === S.fbUser.uid;
-    o+='<div class="ri tap" onclick="openJogador('+j.id+')">';
+    o+='<div class="ri tap" onclick="openJogadorPorUid(\''+jUid+'\')">';
     o+='<span style="color:'+(i<3?'var(--gold)':'var(--muted)')+';font-weight:900;font-size:14px;width:20px;text-align:center;flex-shrink:0">'+(i<3?['🥇','🥈','🥉'][i]:(i+1)+'º')+'</span>';
     o+=av(j.av,42,i<3?'var(--gold)':'');
     o+='<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">'+esc(j.nome)+'</div><div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap">'+pl(j.pos,'#00F082')+pl(j.nivel,'#FFBE00')+'</div></div>';
@@ -2952,7 +2952,7 @@ function screenJogadores(){
     arbs.forEach(function(j){
       var ref=j.juiz;
       var nivelCor={Iniciante:'#00D4C8',Intermediário:'#4D9EFF',Avançado:'#FFBE00',Profissional:'#00F082'}[j.nivel]||'#4D9EFF';
-      o+='<div class="ri tap" onclick="openJogador('+j.id+')" style="border-color:#FFBE0033;background:linear-gradient(135deg,rgba(255,190,0,.05),var(--card))">';
+      o+='<div class="ri tap" onclick="openJogadorPorUid(\''+(j.uid||j.id)+'\')" style="border-color:#FFBE0033;background:linear-gradient(135deg,rgba(255,190,0,.05),var(--card))">';
       o+='<div style="font-size:22px;width:28px;text-align:center;flex-shrink:0">🟡</div>';
       o+=av(j.av,42,'#FFBE00');
       o+='<div style="flex:1;min-width:0">';
