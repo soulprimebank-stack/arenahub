@@ -50,6 +50,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <style>
 :root{--bg:#07090F;--bg2:#0C0F1A;--surf:#111520;--card:#151B28;--cardhi:#1C2438;--bord:#1E2D45;--green:#00F082;--gold:#FFBE00;--orange:#FF7043;--red:#FF4060;--blue:#4D9EFF;--purple:#B06EFF;--teal:#00D4C8;--pink:#FF4D8D;--text:#EEF2FF;--text2:#A0AECB;--muted:#4E6080;--muted2:#2A3A52;--greenglow:rgba(0,240,130,.14);}
 html.light{--bg:#F4F6FA;--bg2:#EAECF2;--surf:#FFFFFF;--card:#FFFFFF;--cardhi:#F0F2F8;--bord:#D8DCE8;--text:#111827;--text2:#4B5563;--muted:#9CA3AF;--muted2:#D1D5DB;--greenglow:rgba(0,180,100,.1);}
@@ -888,6 +889,9 @@ function salvarPerfil(){
 
 /* ── FIREBASE AUTH ────────────────────────────────── */
 var _fbApp=null,_fbAuth=null,_fbDb=null,_feedUnsub=null;
+// FCM (Push Notifications)
+var _fbMessaging=null, _fcmToken=null;
+var VAPID_KEY='BPyStPrpopV5sZl_-9ncXOWCB5pl3FoktEQY-zsQJMOOccEwum-CvGNJ8n9vwal_fGasJS2txs6XpttiBIO1cn8';
 // Backend de pagamentos (Vercel + Sunize)
 var API_BACKEND='https://futstory-backend.vercel.app';
 var _polling=null; // timer do polling de status de pagamento
@@ -937,6 +941,7 @@ function _initFirebase(){
       _carregarJogadoresFirestore();
       _iniciarNotificacoesRealtime();
       _iniciarLembretes();
+      _iniciarFCM();
     // Verificar se há campos no Firestore, senão fazer seed
     _fbDb.collection('campos').limit(1).get().then(function(snap){
       if(snap.empty) _seedCamposGoiania();
@@ -4408,6 +4413,98 @@ function toggleDark() {
   });
 })();
 
+/* ── PUSH NOTIFICATIONS (FCM) ──────────────────────── */
+// Registra o device no FCM e salva o token no Firestore
+function _iniciarFCM(){
+  if(!S.fbUser||!_fbApp) return;
+  
+  // Checar se o browser suporta notifications
+  if(!('Notification' in window)){
+    console.log('FCM: browser não suporta Notifications');
+    return;
+  }
+  
+  // Checar se suporta Service Worker (necessário pra FCM)
+  if(!('serviceWorker' in navigator)){
+    console.log('FCM: browser não suporta Service Worker');
+    return;
+  }
+  
+  try{
+    _fbMessaging = firebase.messaging(_fbApp);
+  }catch(e){
+    console.warn('FCM: messaging não suportado:', e.message);
+    return;
+  }
+  
+  // Pedir permissão + obter token
+  Notification.requestPermission().then(function(permission){
+    if(permission !== 'granted'){
+      console.log('FCM: permissão negada pelo user');
+      return;
+    }
+    
+    // Obter Service Worker registrado
+    navigator.serviceWorker.ready.then(function(registration){
+      _fbMessaging.getToken({
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration
+      }).then(function(token){
+        if(!token){
+          console.log('FCM: token vazio');
+          return;
+        }
+        _fcmToken = token;
+        console.log('FCM: token obtido, salvando no Firestore');
+        // Salvar token no perfil do user (array pra suportar múltiplos devices)
+        _fbDb.collection('usuarios').doc(S.fbUser.uid).update({
+          fcmTokens: firebase.firestore.FieldValue.arrayUnion(token)
+        }).catch(function(e){
+          // Se o doc não existe, criar
+          _fbDb.collection('usuarios').doc(S.fbUser.uid).set({
+            fcmTokens: [token]
+          }, {merge: true});
+        });
+      }).catch(function(e){
+        console.warn('FCM getToken erro:', e.message);
+      });
+    });
+    
+    // Listener pra mensagens recebidas com app em foreground
+    _fbMessaging.onMessage(function(payload){
+      console.log('FCM foreground:', payload);
+      var titulo = payload.notification ? payload.notification.title : 'FutStory';
+      var corpo = payload.notification ? payload.notification.body : '';
+      // Mostrar notificação mesmo com app aberto
+      if(Notification.permission === 'granted'){
+        try{
+          navigator.serviceWorker.ready.then(function(reg){
+            reg.showNotification(titulo, {
+              body: corpo,
+              icon: '/arenahub/icon-192.png',
+              badge: '/arenahub/icon-192.png',
+              tag: payload.data && payload.data.tag || 'futstory',
+              data: payload.data || {}
+            });
+          });
+        }catch(e){ console.warn('show notif:', e.message); }
+      }
+    });
+  }).catch(function(e){
+    console.warn('FCM permission erro:', e.message);
+  });
+}
+
+// Remover token ao fazer logout (limpa pra não notificar user errado)
+function _limparFCM(){
+  if(_fcmToken && S.fbUser && _fbDb){
+    _fbDb.collection('usuarios').doc(S.fbUser.uid).update({
+      fcmTokens: firebase.firestore.FieldValue.arrayRemove(_fcmToken)
+    }).catch(function(){});
+  }
+  _fcmToken = null;
+}
+
 /* ── AUTO NOTIF (simulated push) ───────────────── */
 /* ── NOTIFICAÇÕES FIRESTORE ──────────────────────── */
 var _notifUnsub=null;
@@ -4442,6 +4539,35 @@ function _enviarNotificacao(uidDestino,tipo,txt,uidOrigem,tipoIcon){
       lida:false,
       timestamp:firebase.firestore.FieldValue.serverTimestamp()
     }).catch(function(){});
+  
+  // Enviar push FCM pra tipos selecionados (mensagem + seguir)
+  // Pagamento é disparado pelo backend direto via webhook-sunize
+  var tipoPush = null;
+  var titulo = 'FutStory';
+  if(tipo === 'msg' || tipo === 'mensagem'){
+    tipoPush = 'mensagem';
+    titulo = '💬 Nova mensagem';
+  } else if(tipo === 'seguiu' || tipo === 'follow' || tipoIcon === 'follow'){
+    tipoPush = 'seguir';
+    titulo = '👤 Novo seguidor';
+  }
+  
+  if(tipoPush && S.fbUser){
+    // Obter idToken do user atual e chamar endpoint
+    S.fbUser.getIdToken().then(function(idToken){
+      fetch(API_BACKEND + '/api/enviar-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken: idToken,
+          uidDestino: uidDestino,
+          tipo: tipoPush,
+          titulo: titulo,
+          corpo: txt
+        })
+      }).catch(function(e){ console.warn('Push erro:', e.message); });
+    }).catch(function(){});
+  }
 }
 
 function marcarNotifsLidas(){
