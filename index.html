@@ -417,7 +417,17 @@ function setNav(id){
     if(lb)lb.className='nbi-lb'+(n===id&&!S.admin?' a':'');
   });
 }
+// ---- RENDER COM DEBOUNCE (evita tremor/flicker) ----
+var _renderPending = false;
 function render(){
+  if(_renderPending) return;
+  _renderPending = true;
+  requestAnimationFrame(function(){
+    _renderPending = false;
+    _renderInterno();
+  });
+}
+function _renderInterno(){
   var el=document.getElementById('screen');
   if(!el)return;
   // --- INPUT PRESERVATION: salva valores/foco/cursor antes de destruir DOM ---
