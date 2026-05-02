@@ -5752,20 +5752,51 @@ function _mostrarBannerAtualizacao(novoWorker){
 })();
 </script>
 
-<!-- PATCH_MAPA_AUTO_INIT: garante que mapa renderiza ao entrar na aba Campos>Mapa -->
+<!-- PATCH_MAPA_AUTO_INIT v2: garante geocoding + init mapa automáticos -->
 <script>
 (function(){
-  function tentarInitMapa(){
-    if(typeof _initMapaCampos !== 'function') return;
-    var ph = document.getElementById('mapa-campos-placeholder');
-    var jaTemMapa = document.querySelector('.leaflet-container');
-    if(ph && ph.offsetParent !== null && !jaTemMapa){
-      try { _initMapaCampos(); } catch(e){ console.warn('init mapa falhou:', e); }
+  // Monitora estado e dispara init+geocoding quando entra no modo mapa
+  var _mapaUltimoEstado = null;
+  function tickMapa(){
+    try {
+      if(typeof S === 'undefined' || S.scr !== 'campos') return;
+      if(S.camposModo !== 'mapa') return;
+      
+      // 1. Verificar se mapa Leaflet já existe
+      var jaTemMapa = !!document.querySelector('.leaflet-container');
+      var ph = document.getElementById('mapa-campos-placeholder') || document.getElementById('mapa-campos');
+      
+      if(!jaTemMapa && ph && typeof L !== 'undefined' && typeof _initMapaCampos === 'function'){
+        // Inicializar mapa
+        try { _initMapaCampos(); } catch(e){ console.warn('initMapa:', e); }
+      }
+      
+      // 2. Verificar se algum campo não tem lat/lng e disparar geocoding
+      if(typeof D !== 'undefined' && D.camposFirestore && D.camposFirestore.length){
+        var faltam = D.camposFirestore.filter(function(c){ return !c.lat || !c.lng; }).length;
+        if(faltam > 0 && !window._geocodingRodando && typeof _geocodificarCampos === 'function'){
+          window._geocodingRodando = true;
+          _geocodificarCampos().then(function(n){
+            window._geocodingRodando = false;
+            if(n > 0 && S.scr === 'campos' && S.camposModo === 'mapa' && typeof _renderMapaCampos === 'function'){
+              try { _renderMapaCampos(); } catch(e){}
+            }
+          }).catch(function(){
+            window._geocodingRodando = false;
+          });
+        }
+      }
+    } catch(e){
+      console.warn('tickMapa:', e);
     }
   }
-  var obs = new MutationObserver(function(){ setTimeout(tentarInitMapa, 100); });
-  obs.observe(document.body, {childList: true, subtree: true});
-  setInterval(tentarInitMapa, 2000);
+  // Rodar a cada 1.5s
+  setInterval(tickMapa, 1500);
+  // Também em mudanças de DOM
+  if(typeof MutationObserver !== 'undefined'){
+    var obs = new MutationObserver(function(){ setTimeout(tickMapa, 200); });
+    obs.observe(document.body, {childList: true, subtree: true});
+  }
 })();
 </script>
 </body>
