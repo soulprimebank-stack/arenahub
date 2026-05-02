@@ -5681,5 +5681,22 @@ function _mostrarBannerAtualizacao(novoWorker){
   };
 })();
 </script>
+
+<!-- PATCH_MAPA_AUTO_INIT: garante que mapa renderiza ao entrar na aba Campos>Mapa -->
+<script>
+(function(){
+  function tentarInitMapa(){
+    if(typeof _initMapaCampos !== 'function') return;
+    var ph = document.getElementById('mapa-campos-placeholder');
+    var jaTemMapa = document.querySelector('.leaflet-container');
+    if(ph && ph.offsetParent !== null && !jaTemMapa){
+      try { _initMapaCampos(); } catch(e){ console.warn('init mapa falhou:', e); }
+    }
+  }
+  var obs = new MutationObserver(function(){ setTimeout(tentarInitMapa, 100); });
+  obs.observe(document.body, {childList: true, subtree: true});
+  setInterval(tentarInitMapa, 2000);
+})();
+</script>
 </body>
 </html>
