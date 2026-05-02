@@ -1850,7 +1850,7 @@ function openJogadorPorUid(uid){
   // 1. Tenta encontrar nos jogadores já carregados
   for(var i=0;i<D.jogadores.length;i++){
     if(D.jogadores[i].uid===uid || D.jogadores[i].id===uid){
-      S.jSel=D.jogadores[i];S.jAv=false;S.jES=0;render();sc();return;
+      S.jSel=D.jogadores[i];S.jAv=false;S.jES=0;S.scr='jogadores';render();sc();return;
     }
   }
   // 2. Busca no cache de usuários
@@ -1868,7 +1868,7 @@ function openJogadorPorUid(uid){
       gols: cache.gols||0, assist: cache.assist||0, jogos: cache.jogos||0,
       nota: cache.nota||0
     };
-    S.jAv=false;S.jES=0;render();sc();return;
+    S.jAv=false;S.jES=0;S.scr='jogadores';render();sc();return;
   }
   // 3. Busca no Firestore
   if(!_fbDb){toast('Carregando perfil...');return;}
@@ -1888,7 +1888,7 @@ function openJogadorPorUid(uid){
       gols: d.gols||0, assist: d.assist||0, jogos: d.jogos||0,
       nota: d.nota||0
     };
-    S.jAv=false;S.jES=0;render();sc();
+    S.jAv=false;S.jES=0;S.scr='jogadores';render();sc();
   }).catch(function(e){toast('Erro ao abrir perfil');console.warn(e);});
 }
 
