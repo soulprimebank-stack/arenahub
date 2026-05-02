@@ -3819,6 +3819,76 @@ function _initMapaCampos(){
   }, 400);
 }
 
+// ============== GEOCODING AUTOMATICO PARA CAMPOS ==============
+window._geoCache = window._geoCache || {};
+async function _geocodificarCampos(){
+  if(!D.camposFirestore || !D.camposFirestore.length) return 0;
+  var atualizados = 0;
+  var GO_LAT = -16.6869, GO_LNG = -49.2648;
+  for(var i = 0; i < D.camposFirestore.length; i++){
+    var c = D.camposFirestore[i];
+    if(c.lat && c.lng) continue;
+    var queryParts = [];
+    if(c.enderecoCompleto) queryParts.push(c.enderecoCompleto);
+    else {
+      if(c.rua) queryParts.push(c.rua + (c.numero ? ', ' + c.numero : ''));
+      if(c.bairro) queryParts.push(c.bairro);
+      if(c.cidade) queryParts.push(c.cidade);
+      queryParts.push('Goias, Brasil');
+    }
+    var q = queryParts.join(', ');
+    if(window._geoCache[q]){
+      c.lat = window._geoCache[q].lat;
+      c.lng = window._geoCache[q].lng;
+      atualizados++;
+      continue;
+    }
+    try {
+      var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=br';
+      var resp = await fetch(url, {headers:{'Accept-Language':'pt-BR'}});
+      var data = await resp.json();
+      if(data && data.length > 0){
+        c.lat = parseFloat(data[0].lat);
+        c.lng = parseFloat(data[0].lon);
+        window._geoCache[q] = {lat: c.lat, lng: c.lng};
+        try {
+          if(c.id) _fbDb.collection('campos').doc(c.id).update({lat: c.lat, lng: c.lng});
+        } catch(e){}
+        atualizados++;
+      } else {
+        c.lat = GO_LAT;
+        c.lng = GO_LNG;
+        atualizados++;
+      }
+    } catch(e){
+      c.lat = GO_LAT;
+      c.lng = GO_LNG;
+      atualizados++;
+    }
+    await new Promise(r => setTimeout(r, 1100));
+  }
+  return atualizados;
+}
+(function(){
+  var orig = window._carregarCamposFirestore;
+  if(typeof orig !== 'function') return;
+  window._carregarCamposFirestore = function(){
+    var promise = orig.apply(this, arguments);
+    if(promise && typeof promise.then === 'function'){
+      promise.then(function(){
+        _geocodificarCampos().then(function(n){
+          if(n > 0 && S.scr === 'campos' && S.camposModo === 'mapa'){
+            if(typeof _renderMapaCampos === 'function') _renderMapaCampos();
+          }
+        });
+      });
+    }
+    return promise;
+  };
+})();
+// ===============================================================
+
+
 function _renderMapaCampos(){
   var placeholder = document.getElementById('mapa-campos-placeholder');
   if(!placeholder) return;
